@@ -3,6 +3,7 @@ import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } fr
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../theme/appColors';
 import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
+import { Image } from 'react-native';
 import {
   AuthCheckboxRow,
   AuthDividerLabel,
@@ -33,10 +34,10 @@ export function LoginScreen({ navigate }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.nextLogo, { width: logoW, height: logoH }]}>
-          <Text style={[styles.logoText, { fontSize: logoFontSize, lineHeight: logoFontSize }]}>NEXT{'\n'}BOOK</Text>
-          <View style={styles.logoOwl}>
-            <MaterialCommunityIcons name="owl" size={owlSize} color={colors.brownDark} />
-          </View>
+          <Image
+            source={require("../../assets/logo.png")}
+            style={{ width: 300, height: 200}}
+          />
         </View>
 
         <Text style={[styles.loginTitle, { fontSize: titleSize, lineHeight: titleSize + 8 }]}>Bem-vindo de volta</Text>
@@ -73,10 +74,17 @@ export function LoginScreen({ navigate }) {
         <View style={styles.socialRow}>
           <TouchableOpacity style={styles.socialButton}>
             <View style={styles.googleMark} />
+            <Image
+              source={require("../../assets/google_logo.png")}
+              style={styles.socialLogo}
+            />
             <Text style={styles.socialText}>Google</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.socialButton}>
-            <MaterialCommunityIcons name="alpha-a-box-outline" size={40} color={colors.ink} />
+            <Image
+              source={require("../../assets/facebook_logo.png")}
+              style={styles.socialLogo}
+            />
             <Text style={styles.socialText}>Facebook</Text>
           </TouchableOpacity>
         </View>
@@ -111,11 +119,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(74, 55, 43, 0.28)',
     textShadowOffset: { width: 3, height: 5 },
     textShadowRadius: 6,
-  },
-  logoOwl: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
   },
   loginTitle: {
     color: colors.ink,
@@ -160,10 +163,9 @@ const styles = StyleSheet.create({
     gap: 18,
     backgroundColor: colors.surfaceWarm,
   },
-  googleMark: {
-    width: 36,
-    height: 36,
-    backgroundColor: '#2d2d3a',
+  socialLogo: {
+    width: 40,
+    height: 40
   },
   socialText: {
     color: colors.ink,

@@ -116,7 +116,7 @@ export const formStyles = StyleSheet.create({
     letterSpacing: 2,
   },
   uploadCoverLarge: {
-    height: 434,
+    height: 350,
     borderRadius: 7,
     backgroundColor: colors.paperStrong,
     alignItems: 'center',

@@ -13,23 +13,13 @@ export function CommunityFeedScreen({ navigate, openMenu }) {
       <Text style={styles.pageSubtitle}>Explore as conversas literárias e trocas de hoje.</Text>
 
       <View style={styles.composerCard}>
-        <UserAvatar initials="NB" color="#1d2935" />
         <View style={styles.composerContent}>
-          <TextInput
-            style={styles.composerInput}
-            placeholder="O que você está lendo agora?"
-            placeholderTextColor={colors.brownDark}
-            multiline
-          />
+          <Text style={styles.pageBig}>Compartilhe com a comunidade o que você está lendo!</Text>
           <View style={styles.composerFooter}>
-            <View style={styles.composerTools}>
-              <Feather name="image" size={22} color={colors.brownDark} />
-              <Feather name="book" size={22} color={colors.brownDark} />
-              <Feather name="map-pin" size={22} color={colors.brownDark} />
-            </View>
-            <TouchableOpacity style={styles.smallBrownButton}>
+            <Text style={styles.pageText}>Escreva o que está achando</Text>
+            <TouchableOpacity style={styles.smallBrownButton} onPress={() => navigate('review')}>
               <Text style={styles.smallBrownButtonText}>
-              {<Feather name="arrow-right" size={18} color={colors.white}/>}
+              Escrever
               </Text>
             </TouchableOpacity>
           </View>
@@ -79,6 +69,15 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     marginTop: 28,
   },
+  pageText:{
+    color: colors.ink,
+    fontSize: 17,
+    marginRight: 10
+  },
+  pageBig:{
+    color: colors.ink,
+    fontSize: 23,
+  },
   pageSubtitle: {
     color: colors.muted,
     fontSize: 18,
@@ -108,7 +107,7 @@ const styles = StyleSheet.create({
   composerFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justifyContent: 'flex-end',
     marginTop: 18,
   },
   composerTools: {
@@ -116,6 +115,7 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   smallBrownButton: {
+
     backgroundColor: colors.brown,
     borderRadius: 20,
     paddingHorizontal: 15,
@@ -123,8 +123,8 @@ const styles = StyleSheet.create({
   },
   smallBrownButtonText: {
     color: colors.white,
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 2,
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 1.5,
   },
 });

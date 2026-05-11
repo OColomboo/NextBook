@@ -46,13 +46,7 @@ export function ChatConversationScreen({ navigate }) {
               Especialista em Livros Raros
             </Text>
           </View>
-          {showPhoneAction ? (
-            <TouchableOpacity style={styles.headerIcon}>
-              <Feather name="phone" size={isCompact ? 24 : 28} color={colors.brownDark} />
-            </TouchableOpacity>
-          ) : (
-            <View style={{ width: 8 }} />
-          )}
+
           <TouchableOpacity style={styles.headerIcon}>
             <Entypo name="dots-three-vertical" size={isCompact ? 20 : 23} color={colors.brownDark} />
           </TouchableOpacity>
@@ -113,7 +107,8 @@ export function ChatConversationScreen({ navigate }) {
             <Feather name="plus" size={isCompact ? 15 : 20} color={colors.brown} />
           </TouchableOpacity>
           <View style={[styles.messageInputWrap, isCompact && styles.messageInputWrapCompact]}>
-            <TextInput style={[styles.messageInput, isCompact && { fontSize: 10 }]} placeholder="..." placeholderTextColor="#b8aea9" />          </View>
+            <TextInput style={[styles.messageInput, isCompact && { fontSize: 10 }]} placeholder="..." placeholderTextColor="#b8aea9" />
+          </View>
           <TouchableOpacity style={[styles.sendButton, isCompact && styles.sendButtonCompact]}>
             <Ionicons name="send" size={isCompact ? 15 : 20} color={colors.white} />
           </TouchableOpacity>
@@ -303,14 +298,11 @@ const styles = StyleSheet.create({
   sendButton: {
     width: 50,
     height: 50,
-    borderRadius: 15,
+    borderRadius: 25,
     backgroundColor: colors.brown,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  sendButtonCompact: {
-    width: 50,
-    height: 50,
-  },
+
 });

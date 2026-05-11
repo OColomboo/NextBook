@@ -8,10 +8,9 @@ import { FormField, FormSelectField, formStyles } from '../components/forms/Form
 export function AddBookListingScreen({ navigate, openMenu }) {
   return (
     <MainScreenScaffold active="add" navigate={navigate} openMenu={openMenu} headerSearch={false}>
-      <Text style={styles.addTitle}>Adicionar à Coleção</Text>
+      <Text style={styles.addTitle}>Anunciar livro</Text>
       <Text style={styles.addSubtitle}>
-        Compartilhe sua jornada literária. Preencha os detalhes do manuscrito para que ele encontre seu próximo
-        curador no ecossistema NextBook.
+        Preencha os campos abaixo para criar um anúncio do seu livro.
       </Text>
 
       <View style={formStyles.uploadCoverLarge}>
@@ -59,15 +58,15 @@ export function AddBookListingScreen({ navigate, openMenu }) {
 const styles = StyleSheet.create({
   addTitle: {
     color: colors.brown,
-    fontSize: 28,
+    fontSize: 30,
     lineHeight: 34,
-    marginTop: 28,
+    marginTop: 20,
   },
   addSubtitle: {
     color: '#756b65',
     fontSize: 16,
     lineHeight: 25,
-    marginTop: 16,
-    marginBottom: 44,
+    marginTop: 15,
+    marginBottom: 15,
   },
 });

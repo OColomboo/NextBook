@@ -14,7 +14,6 @@ export function DiscoverBooksScreen({ navigate, openMenu }) {
 
   return (
     <MainScreenScaffold active="discover" navigate={navigate} openMenu={openMenu} library headerProfile={false}>
-      <View style={[styles.discoverTopLine, { marginLeft: -gutterContent }]} />
       <Text style={[styles.discoverTitle, { fontSize: titleSize, lineHeight: titleSize + 8 }]}>Descubra seu próximo capítulo.</Text>
 
       <View style={styles.searchBox}>
@@ -31,12 +30,14 @@ export function DiscoverBooksScreen({ navigate, openMenu }) {
         <GenrePillTag label="Ficção" />
         <GenrePillTag label="Filosofia" />
         <GenrePillTag label="História" />
+        <GenrePillTag label="Fantasia" />
+        <GenrePillTag label="Romance" />
+        <GenrePillTag label="Infanto-juvenil"/>
       </ScrollView>
 
       <TouchableOpacity activeOpacity={0.82} onPress={() => navigate('details')}>
         <View style={styles.featureBookCard}>
           <View style={styles.secretCover}>
-            <Text style={styles.coverRibbon}>TROCA DISPONÍVEL</Text>
             <Text style={styles.secretCoverText}>THE{'\n'}SECRET{'\n'}HISTORY</Text>
           </View>
           <View style={styles.bookCardBody}>
@@ -107,16 +108,10 @@ export function DiscoverBooksScreen({ navigate, openMenu }) {
 }
 
 const styles = StyleSheet.create({
-  discoverTopLine: {
-    width: 116,
-    height: 3,
-    backgroundColor: colors.greenDark,
-    marginLeft: 0,
-    marginBottom: 14,
-  },
   discoverTitle: {
     color: colors.ink,
-    marginBottom: 24,
+    marginBottom: 20,
+    marginTop: 10,
   },
   searchBox: {
     minHeight: 53,
@@ -133,7 +128,7 @@ const styles = StyleSheet.create({
   },
   pillRow: {
     gap: 12,
-    paddingBottom: 30,
+    paddingBottom: 20,
   },
   featureBookCard: {
     borderRadius: 7,

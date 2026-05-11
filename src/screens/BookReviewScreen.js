@@ -11,8 +11,7 @@ export function BookReviewScreen({ navigate, openMenu }) {
       <Text style={styles.reviewEyebrow}>CURADORIA LITERÁRIA</Text>
       <Text style={styles.reviewTitle}>Avaliar Nova Leitura</Text>
       <Text style={styles.reviewSubtitle}>
-        Sua perspectiva enriquece nossa comunidade. Compartilhe suas impressões sobre a obra e ajude outros
-        bibliófilos em suas escolhas.
+        O que você achou dessa leitura? Compartilhe com a comunidade!
       </Text>
 
       <View style={styles.reviewUpload}>
