@@ -1,0 +1,130 @@
+import React from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { colors } from '../theme/appColors';
+import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
+import { UserAvatar } from '../components/community/UserAvatar';
+import { CommunityPostCard } from '../components/community/CommunityPostCard';
+
+export function CommunityFeedScreen({ navigate, openMenu }) {
+  return (
+    <MainScreenScaffold active="community" navigate={navigate} openMenu={openMenu}>
+      <Text style={styles.pageTitle}>Comunidade</Text>
+      <Text style={styles.pageSubtitle}>Explore as conversas literárias e trocas de hoje.</Text>
+
+      <View style={styles.composerCard}>
+        <UserAvatar initials="NB" color="#1d2935" />
+        <View style={styles.composerContent}>
+          <TextInput
+            style={styles.composerInput}
+            placeholder="O que você está lendo agora?"
+            placeholderTextColor={colors.brownDark}
+            multiline
+          />
+          <View style={styles.composerFooter}>
+            <View style={styles.composerTools}>
+              <Feather name="image" size={22} color={colors.brownDark} />
+              <Feather name="book" size={22} color={colors.brownDark} />
+              <Feather name="map-pin" size={22} color={colors.brownDark} />
+            </View>
+            <TouchableOpacity style={styles.smallBrownButton}>
+              <Text style={styles.smallBrownButtonText}>
+              {<Feather name="arrow-right" size={18} color={colors.white}/>}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      <CommunityPostCard
+        avatar="BO"
+        name="Beatriz Oliveira"
+        meta="HÁ 15 MINUTOS • LENDO"
+        text={'Finalmente comecei "Torto Arado" e estou completamente hipnotizada pela escrita do Itamar Vieira Junior. A conexão com a terra e a ancestralidade é palpável em cada frase. Alguém mais sentiu esse impacto logo nas primeiras páginas?'}
+        imageType="openBook"
+        likes="124"
+        comments="32"
+      />
+
+      <CommunityPostCard
+        avatar="RS"
+        name="Ricardo Santos"
+        meta="HÁ 1 HORA • TROCA"
+        text={'Tenho uma edição de luxo de "Grande Sertão: Veredas" em estado de novo. Procuro por edições raras da DarkSide ou clássicos da Cosac Naify. Alguém interessado em Belo Horizonte?'}
+        badge="DISPONÍVEL"
+        quote
+        likes="45"
+        comments="12"
+        action="TENHO INTERESSE"
+        accent
+      />
+
+      <CommunityPostCard
+        avatar="ML"
+        name="Mariana Lima"
+        meta="HÁ 3 HORAS • PENSAMENTO"
+        text={'"Ler é sonhar de olhos abertos e viajar sem sair do lugar. Qual foi o livro que mais te fez viajar este ano?"'}
+        likes="89"
+        comments="56"
+        centered
+      />
+    </MainScreenScaffold>
+  );
+}
+
+const styles = StyleSheet.create({
+  pageTitle: {
+    color: colors.ink,
+    fontSize: 33,
+    lineHeight: 40,
+    marginTop: 28,
+  },
+  pageSubtitle: {
+    color: colors.muted,
+    fontSize: 18,
+    lineHeight: 25,
+    marginTop: 12,
+    marginBottom: 34,
+  },
+  composerCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.paper,
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 30,
+  },
+  composerContent: {
+    flex: 1,
+  },
+  composerInput: {
+    paddingLeft: 20,
+    minHeight: 72,
+    color: colors.ink,
+    fontSize: 20,
+    lineHeight: 29,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e3d7c8',
+  },
+  composerFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    marginTop: 18,
+  },
+  composerTools: {
+    flexDirection: 'row',
+    gap: 20,
+  },
+  smallBrownButton: {
+    backgroundColor: colors.brown,
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
+  },
+  smallBrownButtonText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+});
