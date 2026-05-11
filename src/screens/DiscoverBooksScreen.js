@@ -35,7 +35,7 @@ export function DiscoverBooksScreen({ navigate, openMenu }) {
         <GenrePillTag label="Infanto-juvenil"/>
       </ScrollView>
 
-      <TouchableOpacity activeOpacity={0.82} onPress={() => navigate('details')}>
+      <TouchableOpacity activeOpacity={0.82} onPress={() => navigate('bookDetail')}>
         <View style={styles.featureBookCard}>
           <View style={styles.secretCover}>
             <Text style={styles.secretCoverText}>THE{'\n'}SECRET{'\n'}HISTORY</Text>

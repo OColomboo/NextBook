@@ -6,6 +6,7 @@ export const screenDrawerMenuItems = [
   ['community', 'Comunidade'],
   ['add', 'Anunciar Livro'],
   ['review', 'Avaliar Livro'],
-  ['details', 'Detalhes do Livro'],
+  ['details', 'Estante'],
+  ['bookDetail', 'Detalhe do anúncio'],
   ['chat', 'Chat'],
 ];

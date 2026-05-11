@@ -1,253 +1,363 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather, FontAwesome, Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { colors } from '../theme/appColors';
 import { cardShadow } from '../theme/cardShadow';
 import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { GenrePillTag } from '../components/books/GenrePillTag';
-import { UserAvatar } from '../components/community/UserAvatar';
+import { BookListCard } from '../components/books/BookListCard';
+
+const STATS = [
+  { key: 'owned', label: 'NA ESTANTE', value: '12' },
+  { key: 'trade', label: 'PARA TROCA', value: '3' },
+  { key: 'saved', label: 'SALVOS', value: '5' },
+  { key: 'wish', label: 'QUERO LER', value: '8' },
+];
+
+const OWNED_ITEMS = [
+  { title: 'Torto Arado', author: 'Itamar Vieira Junior', color: '#2d4a3e' },
+  { title: 'Grande Sertão', author: 'Guimarães Rosa', color: '#3d2918' },
+  { title: 'Onde mora o Slime', author: 'Fusion', color: '#4a3d6b' },
+];
+
+const SAVED_ITEMS = [
+  { title: 'The Secret History', author: 'Donna Tartt', color: '#0a1210' },
+  { title: 'Sapiens', author: 'Yuval Harari', color: '#6b5344' },
+];
+
+const WISH_ITEMS = [
+  { title: 'Cem Anos', author: 'García Márquez', color: '#8b6914' },
+  { title: 'Duna', author: 'Frank Herbert', color: '#c4a574' },
+  { title: 'Lavoura Arcaica', author: 'Raduan Nassar', color: '#5c4033' },
+];
+
+function ShelfThumb({ title, author, color }) {
+  return (
+    <TouchableOpacity style={styles.thumbCard} activeOpacity={0.85}>
+      <View style={[styles.thumbCover, { backgroundColor: color }]}>
+        <View style={styles.thumbSpine} />
+      </View>
+      <Text style={styles.thumbTitle} numberOfLines={2}>
+        {title}
+      </Text>
+      <Text style={styles.thumbAuthor} numberOfLines={1}>
+        {author}
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 export function BookDetailsScreen({ navigate, openMenu }) {
-  const { gutterContent, isCompact, width } = useResponsiveLayout();
-  const framePad = Math.max(16, Math.min(36, Math.round(gutterContent * 1.15)));
-  const scrollInnerW = width - 2 * gutterContent;
-  const coverInnerW = Math.max(160, scrollInnerW - 2 * framePad);
-  const coverH = Math.min(374, Math.max(220, Math.round(coverInnerW * 1.06)));
+  const { gutterContent, isCompact } = useResponsiveLayout();
+  const [filter, setFilter] = useState('todos');
+  const titleSize = isCompact ? 26 : 31;
 
   return (
     <MainScreenScaffold active="details" navigate={navigate} openMenu={openMenu} library headerProfile={false}>
-      <View style={[styles.detailCoverFrame, { padding: framePad, marginTop: isCompact ? 24 : 36 }]}>
-        <View style={[styles.detailCover, { height: Math.max(220, coverH) }]}>
-          <Text style={styles.detailCoverSmall}>TOM ENCONTRO CONJUNTO DE MANDE</Text>
-          <Text style={styles.detailCoverTitle}>A SOMBRA DO{'\n'}ALQUIMISTA</Text>
-          <View style={styles.detailCoverLines} />
-        </View>
+      <View style={[styles.topLine, { marginLeft: -gutterContent }]} />
+
+      <Text style={[styles.pageTitle, { fontSize: titleSize, lineHeight: titleSize + 8 }]}>Sua estante</Text>
+      <Text style={styles.pageSubtitle}>
+        Livros que você tem, oferece em troca, salvou para depois e quer ler — tudo em um só lugar.
+      </Text>
+
+      <View style={styles.searchBox}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar na sua estante..."
+          placeholderTextColor="#89909e"
+        />
+        <Feather name="search" size={22} color={colors.muted} />
       </View>
 
-      <View style={styles.badgesRow}>
-        <GenrePillTag label="PRIMEIRA EDIÇÃO" />
-        <GenrePillTag label="CAPA DURA" muted />
-      </View>
-
-      <Text style={styles.detailTitle}>A Sombra do Alquimista</Text>
-      <Text style={styles.detailAuthor}>por Julian Thorne</Text>
-
-      <View style={styles.ratingRow}>
-        {[0, 1, 2, 3].map((item) => (
-          <FontAwesome key={item} name="star" size={18} color={colors.caramel} />
+      <View style={styles.statsRow}>
+        {STATS.map((s) => (
+          <View key={s.key} style={styles.statCell}>
+            <Text style={styles.statValue}>{s.value}</Text>
+            <Text style={styles.statLabel}>{s.label}</Text>
+          </View>
         ))}
-        <FontAwesome name="star-half-o" size={18} color={colors.caramel} />
-        <Text style={styles.ratingText}>4.8 (124 avaliações)</Text>
       </View>
 
-      <View style={styles.genreWrap}>
-        <GenrePillTag label="Ficção Histórica" />
-        <GenrePillTag label="Mistério" />
-        <GenrePillTag label="Renascimento" />
-      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.pillRow}
+      >
+        <TouchableOpacity onPress={() => setFilter('todos')} activeOpacity={0.8}>
+          <GenrePillTag label="Todos" active={filter === 'todos'} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setFilter('coleção')} activeOpacity={0.8}>
+          <GenrePillTag label="Minha coleção" active={filter === 'coleção'} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setFilter('troca')} activeOpacity={0.8}>
+          <GenrePillTag label="Para troca" active={filter === 'troca'} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setFilter('salvos')} activeOpacity={0.8}>
+          <GenrePillTag label="Salvos" active={filter === 'salvos'} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setFilter('quero')} activeOpacity={0.8}>
+          <GenrePillTag label="Quero ler" active={filter === 'quero'} />
+        </TouchableOpacity>
+      </ScrollView>
 
-      <View style={styles.synopsisCard}>
-        <Text style={styles.synopsisTitle}>Sinopse</Text>
-        <Text style={styles.synopsisText}>
-          No coração da Veneza do século XV, um mestre artesão descobre um manuscrito oculto que promete os segredos
-          da própria luz. Mas à medida que ele se aprofunda nas sombras da guilda, percebe que algumas verdades devem
-          permanecer enterradas sob a superfície dos canais. Uma história envolvente de ambição, alquimia e o preço da
-          imortalidade.
-        </Text>
-      </View>
-
-      <View style={styles.sellerCard}>
-        <UserAvatar initials="OA" color="#0c1d24" size={56} online />
-        <View style={styles.sellerInfo}>
-          <Text style={styles.sellerEyebrow}>VENDEDOR CONFIÁVEL</Text>
-          <Text style={styles.sellerName}>O Arquivista</Text>
-          <Text style={styles.sellerMeta}>⊙ Vendedor de Elite</Text>
+      {(filter === 'todos' || filter === 'coleção') && (
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionEyebrow}>MINHA COLEÇÃO</Text>
+            <TouchableOpacity onPress={() => setFilter('coleção')}>
+              <Text style={styles.sectionLink}>Filtrar</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.sectionHint}>Livros que você possui fisicamente ou marcou como na estante.</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbRow}>
+            {OWNED_ITEMS.map((b) => (
+              <ShelfThumb key={b.title} {...b} />
+            ))}
+          </ScrollView>
         </View>
-      </View>
+      )}
 
-      <TouchableOpacity style={styles.chatSellerButton} onPress={() => navigate('chat')}>
-        <Ionicons name="chatbox" size={23} color={colors.white} />
-        <Text style={styles.chatSellerText}>Conversar com o vendedor</Text>
+      {(filter === 'todos' || filter === 'troca') && (
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionEyebrow}>OFERTAS DE TROCA</Text>
+            <TouchableOpacity onPress={() => navigate('add')}>
+              <Text style={styles.sectionLink}>+ Anunciar</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.sectionHint}>Títulos disponíveis para negociar com outros arquivistas.</Text>
+
+          <TouchableOpacity activeOpacity={0.9} onPress={() => navigate('bookDetail')}>
+            <BookListCard
+              title="Kafka à Beira-Mar"
+              author="Haruki Murakami"
+              description="Excelente estado, capa original. Procuro ficção contemporânea ou dark fantasy."
+              badge="DISPONÍVEL"
+              action="Ver anúncio"
+              color="#ded6a7"
+              portrait="sea"
+            />
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.9} onPress={() => navigate('bookDetail')}>
+            <BookListCard
+              title="Breve tratado sobre a camaradagem"
+              author="Carolina Maria de Jesus"
+              description="Marcas de uso na capa; miolo íntegro. Preferência por trocas em Curitiba."
+              badge="VERIFICADO"
+              action="Editar troca"
+              color="#253028"
+              portrait="sage"
+            />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {(filter === 'todos' || filter === 'salvos') && (
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionEyebrow}>SALVOS PARA DEPOIS</Text>
+          </View>
+          <Text style={styles.sectionHint}>Inspirações e leituras que você marcou enquanto explorava o app.</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbRow}>
+            {SAVED_ITEMS.map((b) => (
+              <ShelfThumb key={b.title} {...b} />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {(filter === 'todos' || filter === 'quero') && (
+        <View style={[styles.sectionBlock, styles.sectionLast]}>
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionEyebrow}>LISTA QUERO LER</Text>
+            <TouchableOpacity onPress={() => navigate('discover')}>
+              <Text style={styles.sectionLink}>Descobrir</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.sectionHint}>Próximas leituras e desejos para completar coleções ou trocas.</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbRow}>
+            {WISH_ITEMS.map((b) => (
+              <ShelfThumb key={b.title} {...b} />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      <TouchableOpacity style={styles.promoCard} activeOpacity={0.9} onPress={() => navigate('discover')}>
+        <View style={styles.promoCopy}>
+          <Text style={styles.promoEyebrow}>ORGANIZE & TROQUE</Text>
+          <Text style={styles.promoTitle}>Encontre o próximo volume da sua estante</Text>
+          <Text style={styles.promoText}>
+            Explore anúncios, salve favoritos e negocie com a comunidade — sem sair do fluxo de leitura.
+          </Text>
+        </View>
+        <Feather name="arrow-right" size={22} color={colors.brown} />
       </TouchableOpacity>
-
-      <View style={styles.detailActions}>
-        <TouchableOpacity style={styles.saveButton}>
-          <Feather name="bookmark" size={22} color={colors.brown} />
-          <Text style={styles.saveButtonText}>Salvar para depois</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.shareButton}>
-          <Feather name="share-2" size={22} color={colors.brown} />
-        </TouchableOpacity>
-      </View>
     </MainScreenScaffold>
   );
 }
 
 const styles = StyleSheet.create({
-  detailCoverFrame: {
-    backgroundColor: colors.white,
-    marginBottom: 26,
-  },
-  detailCover: {
+  topLine: {
+    width: 116,
+    height: 3,
     backgroundColor: colors.greenDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...cardShadow,
+    marginBottom: 14,
   },
-  detailCoverSmall: {
-    color: colors.greenSoft,
-    fontSize: 9,
-    letterSpacing: 2,
-    position: 'absolute',
-    top: 35,
-  },
-  detailCoverTitle: {
-    color: colors.greenWash,
-    fontSize: 28,
-    lineHeight: 34,
-    textAlign: 'center',
-    fontWeight: '300',
-    letterSpacing: 1.2,
-  },
-  detailCoverLines: {
-    position: 'absolute',
-    bottom: 70,
-    width: 180,
-    height: 1,
-    backgroundColor: colors.greenSoft,
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    gap: 16,
-    alignSelf: 'center',
-    marginBottom: 34,
-  },
-  detailTitle: {
+  pageTitle: {
     color: colors.ink,
-    fontSize: 35,
-    lineHeight: 41,
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  detailAuthor: {
-    color: colors.brown,
-    fontSize: 20,
-    fontStyle: 'italic',
-    marginBottom: 24,
+  pageSubtitle: {
+    color: colors.muted,
+    fontSize: 17,
+    lineHeight: 24,
+    marginBottom: 22,
   },
-  ratingRow: {
+  searchBox: {
+    minHeight: 53,
+    backgroundColor: colors.white,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    marginBottom: 24,
+    paddingHorizontal: 16,
+    marginBottom: 20,
   },
-  ratingText: {
-    color: '#5f5952',
-    fontWeight: '800',
-    marginLeft: 10,
+  searchInput: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 15,
   },
-  genreWrap: {
+  statsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    marginBottom: 34,
+    marginBottom: 22,
   },
-  synopsisCard: {
-    backgroundColor: colors.greenWash,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.greenDark,
+  statCell: {
+    flexGrow: 1,
+    flexBasis: '22%',
+    minWidth: 72,
+    backgroundColor: colors.surfaceWarm,
     borderRadius: 8,
-    padding: 32,
-    marginBottom: 34,
-  },
-  synopsisTitle: {
-    color: colors.brown,
-    fontSize: 20,
-    marginBottom: 18,
-  },
-  synopsisText: {
-    color: '#69625d',
-    fontSize: 17,
-    lineHeight: 29,
-    fontStyle: 'italic',
-  },
-  sellerCard: {
-    backgroundColor: colors.white,
-    borderRadius: 9,
-    padding: 20,
-    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: colors.greenSoft,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    gap: 18,
-    marginBottom: 30,
   },
-  sellerInfo: {
-    flex: 1,
-  },
-  sellerEyebrow: {
-    color: colors.brown,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1.6,
-  },
-  sellerName: {
+  statValue: {
     color: colors.ink,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
-    marginTop: 5,
   },
-  sellerMeta: {
-    color: '#625b56',
-    fontSize: 14,
+  statLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textAlign: 'center',
     marginTop: 4,
   },
-  chatSellerButton: {
-    minHeight: 92,
-    borderRadius: 9,
-    backgroundColor: colors.brown,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 22,
-    paddingHorizontal: 30,
+  pillRow: {
+    gap: 12,
+    paddingBottom: 26,
+  },
+  sectionBlock: {
+    marginBottom: 28,
+  },
+  sectionLast: {
     marginBottom: 18,
-    ...cardShadow,
   },
-  chatSellerText: {
-    color: colors.white,
-    fontSize: 20,
-    lineHeight: 28,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  detailActions: {
-    flexDirection: 'row',
-    gap: 14,
-  },
-  saveButton: {
-    flex: 1,
-    minHeight: 58,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: colors.greenSoft,
-    backgroundColor: colors.surfaceWarm,
+  sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  saveButtonText: {
-    color: colors.brown,
-    fontSize: 16,
+  sectionEyebrow: {
+    color: colors.greenDark,
+    fontSize: 12,
+    letterSpacing: 2.4,
     fontWeight: '800',
   },
-  shareButton: {
-    width: 66,
-    minHeight: 58,
+  sectionLink: {
+    color: colors.brown,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  sectionHint: {
+    color: '#6e655e',
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 16,
+  },
+  thumbRow: {
+    gap: 14,
+    paddingRight: 8,
+  },
+  thumbCard: {
+    width: 128,
+  },
+  thumbCover: {
+    height: 168,
+    borderRadius: 6,
+    marginBottom: 10,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+    ...cardShadow,
+  },
+  thumbSpine: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 6,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  thumbTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  thumbAuthor: {
+    color: '#6f6761',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  promoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    backgroundColor: colors.greenWash,
     borderRadius: 9,
     borderWidth: 1,
     borderColor: colors.greenSoft,
-    backgroundColor: colors.surfaceWarm,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 22,
+    marginBottom: 12,
+  },
+  promoCopy: {
+    flex: 1,
+  },
+  promoEyebrow: {
+    color: colors.greenDark,
+    fontSize: 11,
+    letterSpacing: 3,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  promoTitle: {
+    color: colors.ink,
+    fontSize: 19,
+    fontWeight: '800',
+    lineHeight: 24,
+    marginBottom: 8,
+  },
+  promoText: {
+    color: '#6e655e',
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

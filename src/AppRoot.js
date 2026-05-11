@@ -11,6 +11,7 @@ import { CommunityFeedScreen } from './screens/CommunityFeedScreen';
 import { AddBookListingScreen } from './screens/AddBookListingScreen';
 import { BookReviewScreen } from './screens/BookReviewScreen';
 import { BookDetailsScreen } from './screens/BookDetailsScreen';
+import { BookListingDetailScreen } from './screens/BookListingDetailScreen';
 import { ChatConversationScreen } from './screens/ChatConversationScreen';
 
 function AppContent() {
@@ -43,6 +44,7 @@ function AppContent() {
       {screen === 'add' && <AddBookListingScreen {...sharedProps} />}
       {screen === 'review' && <BookReviewScreen {...sharedProps} />}
       {screen === 'details' && <BookDetailsScreen {...sharedProps} />}
+      {screen === 'bookDetail' && <BookListingDetailScreen {...sharedProps} />}
       {screen === 'chat' && <ChatConversationScreen {...sharedProps} />}
       <NavigationDrawerMenu visible={menuOpen} navigate={navigate} onClose={() => setMenuOpen(false)} />
     </View>
