@@ -27,7 +27,7 @@ export function BookListingDetailScreen({ navigate, openMenu }) {
       </View>
 
       <View style={styles.badgesRow}>
-        <GenrePillTag label="PRIMEIRA EDIÇÃO" />
+        <GenrePillTag label="USADO" />
         <GenrePillTag label="CAPA DURA" muted />
       </View>
 
@@ -55,6 +55,13 @@ export function BookListingDetailScreen({ navigate, openMenu }) {
           da própria luz. Mas à medida que ele se aprofunda nas sombras da guilda, percebe que algumas verdades devem
           permanecer enterradas sob a superfície dos canais. Uma história envolvente de ambição, alquimia e o preço da
           imortalidade.
+        </Text>
+      </View>
+
+       <View style={styles.synopsisCard}>
+        <Text style={styles.synopsisTitle}>Detalhes</Text>
+        <Text style={styles.synopsisText}>
+          Livro usado em condições de uso rasoáveis, primeira edição ITEM DE COLECIONADOR. Para mais fotos e informações inbox.
         </Text>
       </View>
 

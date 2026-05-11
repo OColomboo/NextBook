@@ -37,19 +37,6 @@ export function CommunityFeedScreen({ navigate, openMenu }) {
       />
 
       <CommunityPostCard
-        avatar="RS"
-        name="Ricardo Santos"
-        meta="HÁ 1 HORA • TROCA"
-        text={'Tenho uma edição de luxo de "Grande Sertão: Veredas" em estado de novo. Procuro por edições raras da DarkSide ou clássicos da Cosac Naify. Alguém interessado em Belo Horizonte?'}
-        badge="DISPONÍVEL"
-        quote
-        likes="45"
-        comments="12"
-        action="TENHO INTERESSE"
-        accent
-      />
-
-      <CommunityPostCard
         avatar="ML"
         name="Mariana Lima"
         meta="HÁ 3 HORAS • PENSAMENTO"

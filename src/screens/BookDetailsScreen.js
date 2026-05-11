@@ -10,9 +10,9 @@ import { BookListCard } from '../components/books/BookListCard';
 
 const STATS = [
   { key: 'owned', label: 'NA ESTANTE', value: '12' },
+  { key: 'wish', label: 'A VENDA', value: '8' },
   { key: 'trade', label: 'PARA TROCA', value: '3' },
   { key: 'saved', label: 'SALVOS', value: '5' },
-  { key: 'wish', label: 'QUERO LER', value: '8' },
 ];
 
 const OWNED_ITEMS = [
@@ -55,7 +55,6 @@ export function BookDetailsScreen({ navigate, openMenu }) {
 
   return (
     <MainScreenScaffold active="details" navigate={navigate} openMenu={openMenu} library headerProfile={false}>
-      <View style={[styles.topLine, { marginLeft: -gutterContent }]} />
 
       <Text style={[styles.pageTitle, { fontSize: titleSize, lineHeight: titleSize + 8 }]}>Sua estante</Text>
       <Text style={styles.pageSubtitle}>
@@ -91,14 +90,14 @@ export function BookDetailsScreen({ navigate, openMenu }) {
         <TouchableOpacity onPress={() => setFilter('coleção')} activeOpacity={0.8}>
           <GenrePillTag label="Minha coleção" active={filter === 'coleção'} />
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => setFilter('quero')} activeOpacity={0.8}>
+          <GenrePillTag label="A venda" active={filter === 'quero'} />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => setFilter('troca')} activeOpacity={0.8}>
           <GenrePillTag label="Para troca" active={filter === 'troca'} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setFilter('salvos')} activeOpacity={0.8}>
           <GenrePillTag label="Salvos" active={filter === 'salvos'} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setFilter('quero')} activeOpacity={0.8}>
-          <GenrePillTag label="Quero ler" active={filter === 'quero'} />
         </TouchableOpacity>
       </ScrollView>
 
@@ -171,12 +170,9 @@ export function BookDetailsScreen({ navigate, openMenu }) {
       {(filter === 'todos' || filter === 'quero') && (
         <View style={[styles.sectionBlock, styles.sectionLast]}>
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionEyebrow}>LISTA QUERO LER</Text>
-            <TouchableOpacity onPress={() => navigate('discover')}>
-              <Text style={styles.sectionLink}>Descobrir</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionEyebrow}>LIVROS ANUNCIADOS</Text>
           </View>
-          <Text style={styles.sectionHint}>Próximas leituras e desejos para completar coleções ou trocas.</Text>
+          <Text style={styles.sectionHint}>Confira os livros que você anunciou para venda.</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbRow}>
             {WISH_ITEMS.map((b) => (
               <ShelfThumb key={b.title} {...b} />
@@ -209,6 +205,7 @@ const styles = StyleSheet.create({
   pageTitle: {
     color: colors.ink,
     marginBottom: 12,
+    marginTop: 10,
   },
   pageSubtitle: {
     color: colors.muted,

@@ -66,7 +66,7 @@ export function ChatConversationScreen({ navigate }) {
               <Text style={styles.chatListingTitle}>O Alquimista (1ª Ed. 1988)</Text>
               <Text style={styles.chatListingMeta}>R$ 2.450,00 • Oferta Pendente</Text>
             </View>
-            <TouchableOpacity style={[styles.adButton, isCompact && styles.adButtonCompact]} onPress={() => navigate('bookDetail')}>
+            <TouchableOpacity style={[styles.adButton, isCompact && styles.adButtonCompact]} onPress={() => navigate('details')}>
               <Text style={[styles.adButtonText, isCompact && { fontSize: 15 }]}>Ver Anúncio</Text>
             </TouchableOpacity>
           </View>
@@ -304,5 +304,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
-
+  sendButtonCompact: {
+    width: 50,
+    height: 50,
+  },
 });

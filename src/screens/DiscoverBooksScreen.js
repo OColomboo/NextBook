@@ -37,13 +37,13 @@ export function DiscoverBooksScreen({ navigate, openMenu }) {
 
       <TouchableOpacity activeOpacity={0.82} onPress={() => navigate('bookDetail')}>
         <View style={styles.featureBookCard}>
-          <View style={styles.secretCover}>
-            <Text style={styles.secretCoverText}>THE{'\n'}SECRET{'\n'}HISTORY</Text>
+          <View style={styles.Cover}>
+            <Text style={styles.CoverText}>A SOMBRA{'\n'}DO ALQUIMISTA{'\n'}</Text>
           </View>
           <View style={styles.bookCardBody}>
             <View>
-              <Text style={styles.bookTitle}>The Secret History</Text>
-              <Text style={styles.bookAuthor}>Donna Tartt</Text>
+              <Text style={styles.bookTitle}>A sombra do Alquimista</Text>
+              <Text style={styles.bookAuthor}>Julian Thorne</Text>
             </View>
             <Text style={styles.priceText}>R$ 102,00</Text>
           </View>
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
     borderColor: colors.greenSoft,
     marginBottom: 28,
   },
-  secretCover: {
+  Cover: {
     height: 220,
     backgroundColor: '#08100d',
     alignItems: 'center',
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 2,
   },
-  secretCoverText: {
+  CoverText: {
     color: colors.caramel,
     fontSize: 32,
     lineHeight: 34,
