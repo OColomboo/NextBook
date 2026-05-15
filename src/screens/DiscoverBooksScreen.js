@@ -7,6 +7,8 @@ import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { GenrePillTag } from '../components/books/GenrePillTag';
 import { BookListCard } from '../components/books/BookListCard';
+import firebase from '../firebaseConfig';
+import { getDatabase, ref, onValue } from 'firebase/database';
 
 export function DiscoverBooksScreen({ navigate, openMenu }) {
   const { gutterContent, isCompact } = useResponsiveLayout();

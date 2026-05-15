@@ -1,9 +1,10 @@
-import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import React, { useEffect, useState} from 'react';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import { Feather} from '@expo/vector-icons';
 import { colors } from '../theme/appColors';
 import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
-import { Image } from 'react-native';
+import firebase from '../firebaseConfig';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import {
   AuthCheckboxRow,
   AuthDividerLabel,
@@ -15,11 +16,40 @@ export function LoginScreen({ navigate }) {
   const { gutterContent, width, isCompact, fontScale } = useResponsiveLayout();
   const logoW = Math.min(260, width - gutterContent * 2);
   const logoH = Math.round(logoW * (172 / 260));
-  const owlSize = isCompact ? 54 : 68;
   const titleSize = Math.round((isCompact ? 28 : 34) * Math.min(fontScale, 1.08));
-  const subtitleSize = Math.round((isCompact ? 16 : 18) * Math.min(fontScale, 1.06));
-  const logoFontSize = Math.min(58, Math.round(logoW * 0.22));
-
+  
+  //firebase
+  const auth = getAuth(firebase);
+  const [email, setEmail] = useState ('');
+  const [senha, setSenha] = useState ('');
+  
+  async function login(){
+      await signInWithEmailAndPassword(auth, email, senha)
+      .then((value) => {
+        navigate('discover');
+      }
+  
+      ).catch((error) =>{
+        if (!email){
+          alert('Digite seu e-mail!')
+          return;
+        }
+        if (!senha){
+          alert('Digite sua senha!')
+          return;
+        }
+        if (error.code === 'auth/invalid-email'){
+          alert('Digite um e-mail válido!');
+          return;
+        }
+        if (error.code === 'auth/invalid-credential'){
+          alert('Senha ou email incorretos!');
+          return;
+        }
+        alert('Não foi possivel entrar, tente novamente');
+        })
+  }
+  
   return (
     <SafeAreaView style={styles.authScreen}>
       <ScrollView
@@ -46,6 +76,8 @@ export function LoginScreen({ navigate }) {
           label="ENDEREÇO DE E-MAIL"
           placeholder="arquivista@nextbook.com"
           icon={<Feather name="mail" size={27} color="#e7dad4" />}
+          value={email}
+          onChageText={setEmail}
         />
 
         <AuthInputField
@@ -54,14 +86,20 @@ export function LoginScreen({ navigate }) {
           placeholder="••••••••••••"
           icon={<Feather name="lock" size={27} color="#e7dad4" />}
           secureTextEntry
+          value={senha}
+          onChageText={setSenha}
         />
 
+        {/*
+        // implementar depois
         <AuthCheckboxRow label="Permanecer conectado por 30 dias" large />
+        */}
 
         <AuthPrimaryButton
-          label= "Entrar na Biblioteca"
+          label= "Entrar"
           icon={<Feather name="arrow-right" size={18} color={colors.white}/>}
-          onPress={() => navigate('discover')} />
+          onPress={login}
+        />
 
         <TouchableOpacity style={styles.authLink} onPress={() => navigate('register')}>
           <Text style={styles.authLinkText}>
@@ -91,7 +129,7 @@ export function LoginScreen({ navigate }) {
 
         <View style={styles.authFooter}>
           <Text style={styles.authFooterBrand}>NextBook</Text>
-          <Text style={styles.authFooterCopy}>© 2024 COLETIVO ARCHIVIST</Text>
+          <Text style={styles.authFooterCopy}>© 2026 UTFPR</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -110,15 +148,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-  },
-  logoText: {
-    color: 'rgba(29, 70, 38, 0.95)',
-    fontWeight: '900',
-    textAlign: 'center',
-    textShadowColor: 'rgba(74, 55, 43, 0.28)',
-    textShadowOffset: { width: 3, height: 5 },
-    textShadowRadius: 6,
+    marginBottom: 10,
   },
   loginTitle: {
     color: colors.ink,
@@ -127,15 +157,9 @@ const styles = StyleSheet.create({
     marginBottom: 50,
     fontFamily: 'Helvetica',
   },
-  loginSubtitle: {
-    color: '#5f5751',
-    textAlign: 'center',
-    marginTop: 16,
-    marginBottom: 44,
-  },
   authLink: {
     alignItems: 'center',
-    paddingVertical: 46,
+    paddingVertical: 30,
   },
   authLinkText: {
     color: '#5c544f',

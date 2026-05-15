@@ -1,8 +1,10 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../theme/appColors';
 import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
+import firebase from '../firebaseConfig';
+import { getAuth, createUserWithEmailAndPassword} from 'firebase/auth';
 import {
   AuthCheckboxRow,
   AuthDividerLabel,
@@ -15,8 +17,43 @@ export function RegisterScreen({ navigate }) {
   const schoolSize = isCompact ? 72 : 95;
   const titleSize = Math.round((isCompact ? 30 : 38) * Math.min(fontScale, 1.06));
   const subSize = Math.round((isCompact ? 17 : 21) * Math.min(fontScale, 1.05));
+  const [nome, setNome] = useState('');
+  const [email, setEmail] = useState('');
+  const [telefone, setTelefone] = useState('');
+  const [cidade, setCidade] = useState('');
+  const [senha, setSenha] = useState('');
+  const auth = getAuth(firebase);
+  
+  async function cadastrar(){
+    await createUserWithEmailAndPassword(auth, email, senha)
+      .then((value) => {
+        alert('conta criada: ' + value.user.email);
+        navigate('login');
+      }
+      ).catch((error) =>{
+        if (!senha){
+          alert('Digite uma senha!');
+          return;
+        }
+        if (!email){
+          alert('Digite um e-email!');
+          return;
+        }
+        if (error.code === 'auth/invalid-email'){
+          alert('Insira um email válido!');
+          return;
+        }
+        if (error.code === 'auth/weak-password'){
+          alert('Senha fraca! A senha deve ter 6 caracteres entre letras e números.');
+          return;
+        }
+        console.log(error.code, error.message);
+        alert(error.code);
+      }
+      )
+  }
 
-  return (
+  return(
     <SafeAreaView style={styles.authScreenLight}>
       <ScrollView
         contentContainerStyle={[
@@ -35,12 +72,45 @@ export function RegisterScreen({ navigate }) {
           Junte-se à nossa comunidade de curadores literários.
         </Text>
 
-        <AuthInputField compact label="NOME COMPLETO" placeholder="Como quer ser chamado?" />
-        <AuthInputField compact label="E-MAIL" placeholder="seu@email.com.br" />
-        <AuthInputField compact label="TELEFONE" placeholder="(11) 99999-9999" />
-        <AuthInputField compact label="CIDADE" placeholder="Ex: São Paulo" />
-        <AuthInputField compact label="SENHA" placeholder="••••••••" secureTextEntry />
-        <AuthInputField compact label="CONFIRMAR SENHA" placeholder="••••••••" secureTextEntry />
+        <AuthInputField 
+          compact 
+          label="NOME COMPLETO" 
+          placeholder="Como quer ser chamado?"
+          value={nome}
+          onChangeText={setNome}
+        />
+        
+        <AuthInputField 
+          compact 
+          label="E-MAIL" 
+          placeholder="seu@email.com.br" 
+          value={email}
+          onChangeText={setEmail}
+        />
+
+        <AuthInputField
+        compact
+        label="TELEFONE" 
+        placeholder="(11) 99999-9999" 
+        value={telefone}
+        onChangeText={setTelefone}        
+        />
+
+        <AuthInputField 
+        compact 
+        label="CIDADE" 
+        placeholder="Ex: São Paulo" 
+        value={cidade}
+        onChangeText={setCidade}  
+        />
+
+        <AuthInputField 
+        compact 
+        label="SENHA" 
+        placeholder="••••••••" secureTextEntry 
+        value={senha}
+        onChangeText={setSenha}
+        />
 
         <AuthCheckboxRow>
           <Text style={styles.checkText}>
@@ -48,7 +118,7 @@ export function RegisterScreen({ navigate }) {
           </Text>
         </AuthCheckboxRow>
 
-        <AuthPrimaryButton label="CADASTRAR" onPress={() => navigate('discover')} />
+        <AuthPrimaryButton label="CADASTRAR" onPress={cadastrar} />
 
         <TouchableOpacity style={styles.authLink} onPress={() => navigate('login')}>
           <Text style={styles.authLinkText}>

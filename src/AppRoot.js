@@ -13,6 +13,7 @@ import { BookReviewScreen } from './screens/BookReviewScreen';
 import { BookDetailsScreen } from './screens/BookDetailsScreen';
 import { BookListingDetailScreen } from './screens/BookListingDetailScreen';
 import { ChatConversationScreen } from './screens/ChatConversationScreen';
+import firebase from './firebaseConfig';
 
 function AppContent() {
   const [screen, setScreen] = useState('login');

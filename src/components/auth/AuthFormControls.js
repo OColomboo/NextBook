@@ -3,7 +3,7 @@ import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-nativ
 import { colors } from '../../theme/appColors';
 import { cardShadow } from '../../theme/cardShadow';
 
-export function AuthInputField({ label, rightLabel, placeholder, icon, compact, secureTextEntry }) {
+export function AuthInputField({ label, rightLabel, placeholder, icon, compact, secureTextEntry, value, onChageText, }) {
   return (
     <View style={[styles.authInputGroup, compact && styles.authInputCompact]}>
       <View style={styles.authLabelRow}>
@@ -16,6 +16,8 @@ export function AuthInputField({ label, rightLabel, placeholder, icon, compact, 
           placeholder={placeholder}
           placeholderTextColor="#918881"
           secureTextEntry={secureTextEntry}
+          value={value}
+          onChangeText={onChageText}
         />
         {icon}
       </View>
@@ -128,13 +130,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   primaryButton: {
-    minHeight: 74,
+    minHeight: 70,
     borderRadius: 10,
     backgroundColor: colors.brown,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 14,
+    gap: 10,
     ...cardShadow,
   },
   primaryButtonText: {
@@ -152,7 +154,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 18,
-    marginVertical: 24,
+    marginVertical: 5,
   },
   dividerLine: {
     flex: 1,
