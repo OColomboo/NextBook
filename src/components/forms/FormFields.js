@@ -31,7 +31,7 @@ export function FormSelectField({ label, value }) {
   );
 }
 
-export function FormOutlineField({ label, placeholder, multiline, height }) {
+export function FormOutlineField({ label, placeholder, multiline, height, value, onChangeText }) {
   return (
     <View style={styles.outlineGroup}>
       <Text style={styles.outlineLabel}>{label}</Text>
@@ -40,6 +40,8 @@ export function FormOutlineField({ label, placeholder, multiline, height }) {
         placeholder={placeholder}
         placeholderTextColor="#d7c7c1"
         multiline={multiline}
+        value={value}
+        onChangeText={onChangeText}
         textAlignVertical={multiline ? 'top' : 'center'}
       />
     </View>

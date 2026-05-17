@@ -1,10 +1,11 @@
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../theme/appColors';
 import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import firebase from '../firebaseConfig';
-import { getAuth, createUserWithEmailAndPassword} from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { serverTimestamp, getDatabase, ref, set } from 'firebase/database';
 import {
   AuthCheckboxRow,
   AuthDividerLabel,
@@ -23,22 +24,42 @@ export function RegisterScreen({ navigate }) {
   const [cidade, setCidade] = useState('');
   const [senha, setSenha] = useState('');
   const auth = getAuth(firebase);
+  const db = getDatabase(firebase);
   
   async function cadastrar(){
-    await createUserWithEmailAndPassword(auth, email, senha)
-      .then((value) => {
-        alert('conta criada: ' + value.user.email);
-        navigate('login');
-      }
-      ).catch((error) =>{
-        if (!senha){
-          alert('Digite uma senha!');
-          return;
-        }
-        if (!email){
-          alert('Digite um e-email!');
-          return;
-        }
+    if (!nome){
+      alert('Insira seu nome completo!');
+      return
+    }
+    if (!senha){
+      alert('Digite uma senha!');
+      return;
+    }
+    if (!email){
+      alert('Digite um e-email!');
+      return;
+    }
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
+      const user = userCredential.user;
+
+      await updateProfile(user, {
+        displayName: nome,
+      });
+
+      await set(ref(db, 'usuarios/' + user.uid), {
+        nome,
+        email,
+        telefone,
+        cidade,
+        criadoEm: serverTimestamp(),
+      });
+
+      alert('Conta criada: ' + user.email);
+      navigate('login');
+
+    }catch(error) {
         if (error.code === 'auth/invalid-email'){
           alert('Insira um email válido!');
           return;
@@ -48,9 +69,8 @@ export function RegisterScreen({ navigate }) {
           return;
         }
         console.log(error.code, error.message);
-        alert(error.code);
+        alert(error.code || String(error));
       }
-      )
   }
 
   return(

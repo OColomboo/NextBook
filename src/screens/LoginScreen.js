@@ -77,7 +77,7 @@ export function LoginScreen({ navigate }) {
           placeholder="arquivista@nextbook.com"
           icon={<Feather name="mail" size={27} color="#e7dad4" />}
           value={email}
-          onChageText={setEmail}
+          onChangeText={setEmail}
         />
 
         <AuthInputField
@@ -87,7 +87,7 @@ export function LoginScreen({ navigate }) {
           icon={<Feather name="lock" size={27} color="#e7dad4" />}
           secureTextEntry
           value={senha}
-          onChageText={setSenha}
+          onChangeText={setSenha}
         />
 
         {/*

@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Entypo, Feather, FontAwesome } from '@expo/vector-icons';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { colors } from '../../theme/appColors';
 import { UserAvatar } from './UserAvatar';
 
@@ -8,13 +8,12 @@ export function CommunityPostCard({
   avatar,
   name,
   meta,
+  bookname,
+  rating,
   text,
-  imageType,
-  badge,
-  quote,
+  imageSource,
   likes,
   comments,
-  action,
   accent,
   centered,
 }) {
@@ -26,34 +25,35 @@ export function CommunityPostCard({
           <Text style={styles.postName}>{name}</Text>
           <Text style={styles.postMeta}>{meta}</Text>
         </View>
-        {badge ? (
-          <View style={styles.postBadge}>
-            <Text style={styles.postBadgeText}>{badge}</Text>
-          </View>
-        ) : (
-          <Entypo name="dots-three-horizontal" size={20} color={colors.muted} />
-        )}
       </View>
+        
+        {bookname ? (
+          <View style={styles.BookRatingRow}>
+            <Text style={styles.postBookName}>{bookname}</Text>
 
-      {quote ? (
-        <View style={styles.quoteBox}>
-          <Text style={styles.quoteLabel}>INTERESSE EM TROCA</Text>
-          <Text style={styles.postText}>{text}</Text>
-        </View>
-      ) : (
-        <Text style={[styles.postText, centered && styles.centeredPost]}>{text}</Text>
-      )}
-
-      {imageType === 'openBook' && (
-        <View style={styles.postImage}>
-          <View style={styles.openBook}>
-            <View style={styles.pageLeft} />
-            <View style={styles.pageRight} />
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <FontAwesome
+                  key={star}
+                  name={star <= rating ? 'star' : 'star-o'}
+                  size={18}
+                  color={colors.brownDark}        
+                />
+              ))}
+            </View>
           </View>
-          <View style={styles.coffeeCup} />
-        </View>
-      )}
+        ) : null}
 
+        <Text style={[styles.postText, centered && styles.centeredPost]}>{text}</Text>
+      
+      {imageSource ? (
+        <Image
+          source={{ uri: imageSource}}
+          style={styles.postImage}
+          resizeMode='cover'
+        />
+      ) : null}
+      
       <View style={styles.postFooter}>
         <View style={styles.postStats}>
           <View style={styles.statPair}>
@@ -65,15 +65,7 @@ export function CommunityPostCard({
             <Text style={styles.statText}>{comments}</Text>
           </View>
         </View>
-        {action ? (
-          <View style={styles.interestButtonWrap}>
-            <TouchableOpacity style={styles.interestButton} activeOpacity={0.85}>
-              <Text style={styles.interestText}>{action}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <Feather name={centered ? 'share-2' : 'bookmark'} size={23} color={colors.muted} />
-        )}
+          <Feather name={'bookmark'} size={23} color={colors.muted} />
       </View>
     </View>
   );
@@ -104,23 +96,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
   },
+  postBookName: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 10,
+    flexShrink: 1,
+  },
   postMeta: {
     color: colors.muted,
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1.4,
     marginTop: 3,
-  },
-  postBadge: {
-    backgroundColor: '#f3cec7',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 2,
-  },
-  postBadgeText: {
-    color: colors.brown,
-    fontSize: 10,
-    fontWeight: '800',
   },
   postText: {
     color: colors.ink,
@@ -133,53 +121,12 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     paddingVertical: 34,
   },
-  quoteBox: {
-    backgroundColor: colors.paperStrong,
-    padding: 18,
-    borderRadius: 4,
-  },
-  quoteLabel: {
-    color: colors.brown,
-    fontSize: 15,
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
   postImage: {
+    width: '100%',
     height: 196,
-    backgroundColor: '#815b38',
+    backgroundColor: colors.paperStrong,
     marginTop: 22,
     borderRadius: 3,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 14,
-  },
-  openBook: {
-    width: 170,
-    height: 120,
-    backgroundColor: colors.paperStrong,
-    borderRadius: 3,
-    flexDirection: 'row',
-    padding: 10,
-  },
-  pageLeft: {
-    flex: 1,
-    borderRightWidth: 1,
-    borderRightColor: colors.line,
-    backgroundColor: colors.surfaceWarm,
-  },
-  pageRight: {
-    flex: 1,
-    backgroundColor: colors.surfaceWarm,
-  },
-  coffeeCup: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#28251f',
-    borderWidth: 12,
-    borderColor: '#ece1d1',
   },
   postFooter: {
     borderTopWidth: 1,
@@ -199,33 +146,26 @@ const styles = StyleSheet.create({
     gap: 12,
     minHeight: 32,
   },
+  BookRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+    flexWrap: 'wrap',
+  },
+  starsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
   statPair: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     flexShrink: 0,
   },
-  interestButtonWrap: {
-    flexShrink: 1,
-    maxWidth: '48%',
-    alignItems: 'flex-end',
-  },
   statText: {
     color: '#756b65',
     fontWeight: '800',
-  },
-  interestButton: {
-    width: '100%',
-    backgroundColor: colors.brown,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  interestText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 2,
-    textAlign: 'center',
   },
 });

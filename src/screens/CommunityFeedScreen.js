@@ -1,16 +1,41 @@
-import React from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import React, { useEffect, useState} from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../theme/appColors';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
-import { UserAvatar } from '../components/community/UserAvatar';
 import { CommunityPostCard } from '../components/community/CommunityPostCard';
+import firebase from '../firebaseConfig';
+import { getDatabase, ref, get, onValue} from 'firebase/database';
+
 
 export function CommunityFeedScreen({ navigate, openMenu }) {
+  const [review,setReviews] = useState([]);
+  const db = getDatabase(firebase);
+  
+  useEffect(() => {
+    const reviewRef = ref(db, 'reviews');
+    const unsubscribe = onValue(reviewRef, (snapshot) => {
+      const data = snapshot.val();
+
+      if(!data){
+        setReviews([]);
+        return;
+      }
+
+      const reviewsArray = Object.entries(data)
+        .map(([id, review]) => ({
+          id,
+          ...review,
+        }))
+        .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
+      setReviews(reviewsArray);
+    });
+    return()=> unsubscribe();
+  }, []);
+  
   return (
     <MainScreenScaffold active="community" navigate={navigate} openMenu={openMenu}>
       <Text style={styles.pageTitle}>Comunidade</Text>
-      <Text style={styles.pageSubtitle}>Explore as conversas literárias e trocas de hoje.</Text>
+      <Text style={styles.pageSubtitle}>Explore as opiniôes literárias dos usuários do NextBook.</Text>
 
       <View style={styles.composerCard}>
         <View style={styles.composerContent}>
@@ -26,25 +51,20 @@ export function CommunityFeedScreen({ navigate, openMenu }) {
         </View>
       </View>
 
-      <CommunityPostCard
-        avatar="BO"
-        name="Beatriz Oliveira"
-        meta="HÁ 15 MINUTOS • LENDO"
-        text={'Finalmente comecei "Torto Arado" e estou completamente hipnotizada pela escrita do Itamar Vieira Junior. A conexão com a terra e a ancestralidade é palpável em cada frase. Alguém mais sentiu esse impacto logo nas primeiras páginas?'}
-        imageType="openBook"
-        likes="124"
-        comments="32"
-      />
-
-      <CommunityPostCard
-        avatar="ML"
-        name="Mariana Lima"
-        meta="HÁ 3 HORAS • PENSAMENTO"
-        text={'"Ler é sonhar de olhos abertos e viajar sem sair do lugar. Qual foi o livro que mais te fez viajar este ano?"'}
-        likes="89"
-        comments="56"
-        centered
-      />
+      {review.map((review)=> (
+        <CommunityPostCard
+          key={review.id}
+          avatar={review.userName?.slice(0, 2).toUpperCase() || 'US'}
+          name={review.userName}
+          meta="AVALIAÇÃO"
+          bookname={review.bookname}
+          rating={review.rating}
+          text={review.text}
+          imageSource={review.imageSource}
+          likes={String(review.likes || 0)}
+          comments={String(review.comments || 0)}
+        />
+      ))}
     </MainScreenScaffold>
   );
 }
@@ -82,27 +102,13 @@ const styles = StyleSheet.create({
   composerContent: {
     flex: 1,
   },
-  composerInput: {
-    paddingLeft: 20,
-    minHeight: 72,
-    color: colors.ink,
-    fontSize: 20,
-    lineHeight: 29,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e3d7c8',
-  },
   composerFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     marginTop: 18,
   },
-  composerTools: {
-    flexDirection: 'row',
-    gap: 20,
-  },
   smallBrownButton: {
-
     backgroundColor: colors.brown,
     borderRadius: 20,
     paddingHorizontal: 15,

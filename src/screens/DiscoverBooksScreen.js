@@ -98,13 +98,6 @@ export function DiscoverBooksScreen({ navigate, openMenu }) {
           </TouchableOpacity>
         </View>
       </View>
-
-      <TouchableOpacity
-        style={[styles.floatingAdd, { bottom: isCompact ? 18 : 24 }]}
-        onPress={() => navigate('add')}
-      >
-        <Feather name="plus" size={26} color={colors.white} />
-      </TouchableOpacity>
     </MainScreenScaffold>
   );
 }
