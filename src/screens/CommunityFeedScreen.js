@@ -4,13 +4,32 @@ import { colors } from '../theme/appColors';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { CommunityPostCard } from '../components/community/CommunityPostCard';
 import firebase from '../firebaseConfig';
-import { getDatabase, ref, get, onValue} from 'firebase/database';
+import { getDatabase, ref, get, set, remove, onValue} from 'firebase/database';
+import { getAuth } from 'firebase/auth';
 
 
 export function CommunityFeedScreen({ navigate, openMenu }) {
   const [review,setReviews] = useState([]);
+
   const db = getDatabase(firebase);
+  const auth = getAuth(firebase);
   
+  async function toggleLike(reviewId) {
+    const user = auth.currentUser;
+
+    if (!user) {
+      alert('Você precisa estar logado para curtir!');
+      return;
+    }
+    const likeRef = ref(db, `reviews/${reviewId}/likesByUser/${user.uid}`);
+    const snapshot = await get(likeRef);
+
+    if(snapshot.exists()){
+      await remove(likeRef);
+    } else{
+      await set(likeRef, true);
+    }
+  }
   useEffect(() => {
     const reviewRef = ref(db, 'reviews');
     const unsubscribe = onValue(reviewRef, (snapshot) => {
@@ -42,16 +61,25 @@ export function CommunityFeedScreen({ navigate, openMenu }) {
           <Text style={styles.pageBig}>Compartilhe com a comunidade o que você está lendo!</Text>
           <View style={styles.composerFooter}>
             <Text style={styles.pageText}>Escreva o que está achando</Text>
+            
             <TouchableOpacity style={styles.smallBrownButton} onPress={() => navigate('review')}>
               <Text style={styles.smallBrownButtonText}>
               Escrever
               </Text>
             </TouchableOpacity>
+          
           </View>
         </View>
       </View>
 
-      {review.map((review)=> (
+      {review.map((review)=> {
+      
+      const user = auth.currentUser;
+      const likesByUser = review.likesByUser || {};
+      const liked = !!likesByUser[user?.uid];
+      const likesCount = Object.keys(likesByUser).length;
+      
+      return (
         <CommunityPostCard
           key={review.id}
           avatar={review.userName?.slice(0, 2).toUpperCase() || 'US'}
@@ -61,10 +89,13 @@ export function CommunityFeedScreen({ navigate, openMenu }) {
           rating={review.rating}
           text={review.text}
           imageSource={review.imageSource}
-          likes={String(review.likes || 0)}
+          likes={String(likesCount)}
+          liked={liked}
+          onLikePress={() => toggleLike(review.id)}
           comments={String(review.comments || 0)}
         />
-      ))}
+        );
+      })}
     </MainScreenScaffold>
   );
 }

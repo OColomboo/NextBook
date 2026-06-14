@@ -1,10 +1,10 @@
 import React from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../../theme/appColors';
 import { cardShadow } from '../../theme/cardShadow';
 
-export function FormField({ label, placeholder, multiline, height }) {
+export function FormField({ label, placeholder, multiline, height, value, onChangeText, keyboardType}) {
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.formLabel}>{label}</Text>
@@ -12,6 +12,9 @@ export function FormField({ label, placeholder, multiline, height }) {
         style={[styles.fieldInput, multiline && styles.fieldMultiline, height ? { height } : null]}
         placeholder={placeholder}
         placeholderTextColor="#8c96a3"
+        value={value}
+        onChangeText={onChangeText}
+        keyboardType={keyboardType}
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : 'center'}
       />
@@ -19,14 +22,47 @@ export function FormField({ label, placeholder, multiline, height }) {
   );
 }
 
-export function FormSelectField({ label, value }) {
+export function FormSelectField({ label, value, options = [], onChange}) {
+  const [open, setOpen] = React.useState(false);
+
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.formLabel}>{label}</Text>
-      <View style={styles.selectInput}>
-        <Text style={styles.selectText}>{value}</Text>
-        <Feather name="chevron-down" size={20} color="#87909b" />
-      </View>
+
+      <TouchableOpacity style={[styles.selectInput, open && styles.selectInputOpen]} 
+        onPress={() => setOpen(!open)}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.selectText}>{value || 'Selecione'}</Text>
+        <Feather name={open ? 'chevron-up' : 'chevron-down'} size={20} color={colors.brown}></Feather>
+      </TouchableOpacity>
+
+      {open ? (
+        <View style={styles.selectOptions}>
+          {options.map((option) => {
+            const active = option === value;
+          return (
+            <TouchableOpacity
+              key={option}
+              style={[styles.selectOption, active && styles.selectOptionActive]}
+              onPress={() => {
+                onChange(option);
+                setOpen(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.selectOptionText, active && styles.selectOptionTextActive]}>
+                {option}
+              </Text>
+
+              {active ? (
+                <Feather name='check' size={17} color={colors.brown}/>
+              ) : null}
+            </TouchableOpacity>
+          );
+          })}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -190,6 +226,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  selectInputOpen:{
+    borderColor: colors.brown,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  selectOptions:{
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: colors.brown,
+    borderRadius: 6,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  selectOption:{
+    minHeight: 44,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectOptionActive:{
+    backgroundColor: colors.paperStrong,
+  },
+  selectOptionText:{
+    color: colors.ink,
+    fontSize: 16,
+  },
+  selectOptionTextActive:{
+    color: colors.brown,
+    fontWeight: '900',
   },
   selectText: {
     color: colors.ink,

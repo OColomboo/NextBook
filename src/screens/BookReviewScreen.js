@@ -10,13 +10,32 @@ import { getDatabase, ref as dbRef, push, set, get, serverTimestamp} from 'fireb
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL} from  'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 
+export const bookGenres = [
+  'Ficção Literária',
+  'Romance',
+  'Fantasia',
+  'Ficção Científica',
+  'Mistério',
+  'Suspense',
+  'Terror',
+  'Biografia',
+  'História',
+  'Poesia',
+  'Autoajuda',
+  'Não Ficção',
+  'Infantojuvenil',
+  'Clássicos',
+  'HQ / Mangá',
+  'Internacional',
+]
 
 export function BookReviewScreen({ navigate, openMenu }) {
   const [bookname, setBookname] = useState('');
   const [author, setAuthor] = useState('');
   const [rating, setRating] = useState(0);
-  const [reviewText, setReviewText] = useState('')
+  const [reviewText, setReviewText] = useState('');
   const [coverImage, setCoverImage] = useState(null);
+  const [genre, setGenre] = useState('Ficção Literária');
   
   const auth = getAuth(firebase);
   const db = getDatabase(firebase);
@@ -46,6 +65,7 @@ export function BookReviewScreen({ navigate, openMenu }) {
       userName: userData?.nome || user.displayName || 'usuario',
       bookname,
       author,
+      genre,
       text: reviewText,
       rating,
       likes: 0,
@@ -143,7 +163,11 @@ export function BookReviewScreen({ navigate, openMenu }) {
       <View style={formStyles.softPanel}>
         <Text style={formStyles.panelHeading}>METADADOS</Text>
         <FormField label="EDITORA" placeholder="Ex: Companhia das Letras" />
-        <FormSelectField label="GÊNERO" value="Ficção Literária" />
+        <FormSelectField 
+        label="GÊNERO" 
+        value={genre}
+        options={bookGenres}
+        onChange={setGenre}/>
       </View>
 
       <View style={formStyles.reviewFormPanel}>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { colors } from '../../theme/appColors';
 import { UserAvatar } from './UserAvatar';
@@ -13,6 +13,8 @@ export function CommunityPostCard({
   text,
   imageSource,
   likes,
+  liked,
+  onLikePress,
   comments,
   accent,
   centered,
@@ -56,10 +58,14 @@ export function CommunityPostCard({
       
       <View style={styles.postFooter}>
         <View style={styles.postStats}>
-          <View style={styles.statPair}>
-            <FontAwesome name={likes === '124' ? 'heart' : 'heart-o'} size={23} color={likes === '124' ? colors.brown : colors.muted} />
-            <Text style={styles.statText}>{likes}</Text>
-          </View>
+          <TouchableOpacity style={styles.statPair} onPress={onLikePress} activeOpacity={0.7}>
+          <FontAwesome
+            name={liked ? 'heart' : 'heart-o'}
+            size={23}
+            color={liked ? '#e02424' : colors.muted}
+          />
+          <Text style={styles.statText}>{likes}</Text>
+          </TouchableOpacity>
           <View style={styles.statPair}>
             <Feather name="message-square" size={24} color={colors.muted} />
             <Text style={styles.statText}>{comments}</Text>
