@@ -24,11 +24,6 @@ export function AppHeaderBar({ openMenu, navigate, showSearch = true, showProfil
             <Feather name="search" size={actionSize} color={colors.brownDark} />
           </TouchableOpacity>
         )}
-        {showProfile && (
-          <TouchableOpacity style={styles.headerIcon} onPress={() => navigate('login')}>
-            <Feather name="user-circle" size={actionSize} color={colors.brownDark} />
-          </TouchableOpacity>
-        )}
       </View>
     </View>
   );

@@ -1,16 +1,94 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import React, {useEffect, useState} from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { getAuth } from 'firebase/auth';
 import { colors } from '../theme/appColors';
-import { cardShadow } from '../theme/cardShadow';
 import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { GenrePillTag } from '../components/books/GenrePillTag';
 import { BookListCard } from '../components/books/BookListCard';
+import firebase from '../firebaseConfig';
+import { getDatabase, ref, onValue, serverTimestamp, set } from 'firebase/database';
 
 export function DiscoverBooksScreen({ navigate, openMenu }) {
-  const { gutterContent, isCompact } = useResponsiveLayout();
+  const { isCompact } = useResponsiveLayout();
   const titleSize = isCompact ? 26 : 31;
+  const [bookListings, setBookListings] = useState([]);
+  const [savedListingIds, setSavedListingIds] = useState({});
+  const auth = getAuth(firebase);
+  const db = getDatabase(firebase);
+  const user = auth.currentUser;
+
+  useEffect(() => {
+    const listingRef = ref(db, 'bookListings');
+
+    const unsubscribe = onValue(listingRef, (snapshot) => {
+      const data = snapshot.val();
+
+      if (!data) {
+        setBookListings([]);
+        return;
+      }
+
+      const listingsArray = Object.entries(data)
+      .map(([id, listing]) => ({
+        id,
+        ...listing
+      }))
+      .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
+    
+      setBookListings(listingsArray);
+    });
+
+    return () => unsubscribe();
+    
+  },[db]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setSavedListingIds({});
+      return undefined;
+    }
+
+    const savedRef = ref(db, `savedListings/${user.uid}`);
+    const unsubscribe = onValue(savedRef, (snapshot) => {
+      const savedListings = snapshot.val() || {};
+      const savedIds = Object.keys(savedListings).reduce((acc, id) => {
+        acc[id] = true;
+        return acc;
+      }, {});
+
+      setSavedListingIds(savedIds);
+    });
+
+    return () => unsubscribe();
+  }, [db, user?.uid]);
+
+  async function handleSaveListing(book) {
+    try {
+      if (!user) {
+        alert('Voce precisa estar logado para salvar anuncios.');
+        return;
+      }
+
+      if (!book?.id) {
+        alert('Nao foi possivel encontrar o codigo do anuncio.');
+        return;
+      }
+
+      await set(ref(db, `savedListings/${user.uid}/${book.id}`), {
+        ...book,
+        savedAt: serverTimestamp(),
+      });
+
+      setSavedListingIds((current) => ({
+        ...current,
+        [book.id]: true,
+      }));
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel salvar o anuncio.');
+    }
+  }
 
   return (
     <MainScreenScaffold active="discover" navigate={navigate} openMenu={openMenu} library headerProfile={false}>
@@ -35,74 +113,23 @@ export function DiscoverBooksScreen({ navigate, openMenu }) {
         <GenrePillTag label="Infanto-juvenil"/>
       </ScrollView>
 
-      <TouchableOpacity activeOpacity={0.82} onPress={() => navigate('bookDetail')}>
-        <View style={styles.featureBookCard}>
-          <View style={styles.secretCover}>
-            <Text style={styles.secretCoverText}>THE{'\n'}SECRET{'\n'}HISTORY</Text>
-          </View>
-          <View style={styles.bookCardBody}>
-            <View>
-              <Text style={styles.bookTitle}>The Secret History</Text>
-              <Text style={styles.bookAuthor}>Donna Tartt</Text>
-            </View>
-            <Text style={styles.priceText}>R$ 102,00</Text>
-          </View>
-          <View style={styles.bookCardFooter}>
-            <View style={styles.sellerHandle}>
-              <Ionicons name="person-outline" size={14} color={colors.brown} />
-              <Text style={styles.handleText}>@o_arquivista</Text>
-            </View>
-            <Text style={styles.detailsLink}>Ver Detalhes →</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
+      {bookListings.map((book) => (
+        <BookListCard
+        key={book.id}
+        avatar={book.userName?.slice(0, 2).toUpperCase() || 'US'}
+        name={book.userName}
+        title={book.title}
+        author={book.author}
+        description={book.description || book.synopsis}
+        badge={book.condition?.toUpperCase()|| 'ANÚNCIO'}
+        action={book.dealType === 'troca' ? 'TROCA' : `R$ ${book.price}`}
+        imageSource={book.imageSource}
+        onPress={() => navigate('bookDetail', { book })}
+        saved={Boolean(savedListingIds[book.id])}
+        onSavePress={() => handleSaveListing(book)}
+        />
+      ))}
 
-      <BookListCard
-        title="Kafka à Beira-Mar"
-        author="Haruki Murakami"
-        description="Excelente estado, capa original. Procuro trocas por ficção contemporânea."
-        badge="VENDEDOR PREMIUM"
-        action="Apenas Troca"
-        color="#ded6a7"
-        portrait="sea"
-      />
-
-      <BookListCard
-        title="O Alquimista"
-        author="Paulo Coelho"
-        description="Primeira edição em brochura. Desgaste leve na lombada. Envio de São Paulo."
-        badge="VERIFICADO"
-        action="R$ 65,00"
-        color="#142236"
-        portrait="sage"
-      />
-
-      <View style={styles.curatedCard}>
-        <View style={styles.curatedImage}>
-          <View style={styles.portraitFace} />
-        </View>
-        <Text style={styles.curatedEyebrow}>SELEÇÃO CURADA</Text>
-        <Text style={styles.curatedTitle}>Coleção do Arquivista Moderno</Text>
-        <Text style={styles.curatedText}>
-          Explore uma seleção escolhida a dedo de poesias clássicas e textos de filosofia em primeira edição,
-          atualmente disponíveis para troca.
-        </Text>
-        <View style={styles.curatedActions}>
-          <TouchableOpacity style={styles.curatedPrimary}>
-            <Text style={styles.curatedPrimaryText}>Explorar Galeria</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.curatedSecondary}>
-            <Text style={styles.curatedSecondaryText}>Saiba Mais</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <TouchableOpacity
-        style={[styles.floatingAdd, { bottom: isCompact ? 18 : 24 }]}
-        onPress={() => navigate('add')}
-      >
-        <Feather name="plus" size={26} color={colors.white} />
-      </TouchableOpacity>
     </MainScreenScaffold>
   );
 }
@@ -138,7 +165,7 @@ const styles = StyleSheet.create({
     borderColor: colors.greenSoft,
     marginBottom: 28,
   },
-  secretCover: {
+  Cover: {
     height: 220,
     backgroundColor: '#08100d',
     alignItems: 'center',
@@ -158,7 +185,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 2,
   },
-  secretCoverText: {
+  CoverText: {
     color: colors.caramel,
     fontSize: 32,
     lineHeight: 34,
@@ -208,92 +235,5 @@ const styles = StyleSheet.create({
   detailsLink: {
     color: colors.brown,
     fontWeight: '900',
-  },
-  curatedCard: {
-    borderRadius: 9,
-    backgroundColor: colors.greenWash,
-    borderWidth: 1,
-    borderColor: colors.greenSoft,
-    padding: 28,
-    marginBottom: 22,
-  },
-  curatedImage: {
-    height: 310,
-    backgroundColor: '#111815',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '-3deg' }],
-    marginBottom: 34,
-  },
-  portraitFace: {
-    width: 140,
-    height: 220,
-    borderRadius: 70,
-    backgroundColor: '#d9d1bf',
-    borderWidth: 12,
-    borderColor: '#25261f',
-  },
-  curatedEyebrow: {
-    color: colors.greenDark,
-    fontSize: 12,
-    letterSpacing: 4,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  curatedTitle: {
-    color: colors.ink,
-    fontSize: 31,
-    lineHeight: 36,
-    marginBottom: 16,
-  },
-  curatedText: {
-    color: '#6e655e',
-    fontSize: 15,
-    lineHeight: 23,
-  },
-  curatedActions: {
-    flexDirection: 'row',
-    gap: 14,
-    marginTop: 28,
-  },
-  curatedPrimary: {
-    flex: 1,
-    backgroundColor: colors.brown,
-    borderRadius: 7,
-    minHeight: 58,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  curatedPrimaryText: {
-    color: colors.white,
-    fontSize: 14,
-    lineHeight: 18,
-    textAlign: 'center',
-    fontWeight: '900',
-  },
-  curatedSecondary: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.greenSoft,
-    borderRadius: 7,
-    minHeight: 58,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  curatedSecondaryText: {
-    color: colors.brown,
-    fontWeight: '900',
-  },
-  floatingAdd: {
-    position: 'absolute',
-    right: 0,
-    bottom: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 11,
-    backgroundColor: colors.greenDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...cardShadow,
   },
 });

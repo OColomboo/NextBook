@@ -1,46 +1,127 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather, FontAwesome, Ionicons } from '@expo/vector-icons';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/appColors';
 import { cardShadow } from '../theme/cardShadow';
 import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { GenrePillTag } from '../components/books/GenrePillTag';
 import { UserAvatar } from '../components/community/UserAvatar';
+import { abrirChat } from '../components/chat/ChatService';
+import firebase from '../firebaseConfig';
+import { getAuth } from 'firebase/auth';
+import { getDatabase, ref, remove, serverTimestamp, set } from 'firebase/database';
 
-/** Detalhe de um livro/anúncio (acessível a partir do Descobrir e do Chat). */
-export function BookListingDetailScreen({ navigate, openMenu }) {
+export function BookListingDetailScreen({ navigate, openMenu, routeParams}) {
   const { gutterContent, isCompact, width } = useResponsiveLayout();
   const framePad = Math.max(16, Math.min(36, Math.round(gutterContent * 1.15)));
   const scrollInnerW = width - 2 * gutterContent;
   const coverInnerW = Math.max(160, scrollInnerW - 2 * framePad);
   const coverH = Math.min(374, Math.max(220, Math.round(coverInnerW * 1.06)));
+  const book = routeParams?.book;
+  const auth = getAuth(firebase);
+  const db = getDatabase(firebase);
+  const user = auth.currentUser;
+  const isOwner = user?.uid === book?.userId;
+  const ownerActionText = book?.dealType === 'troca' ? 'Marcar como trocado' : 'Marcar como vendido';
+  const isNegotiated = Boolean(book?.status);
+  const negotiatedText = book?.status === 'trocado' ? 'Anuncio trocado' : 'Anuncio vendido';
+
+  if (!book) {
+    return (
+      <MainScreenScaffold navigate={navigate} openMenu={openMenu} library headerProfile={false}>
+        <Text style={styles.detailTitle}>Anúncio não encontrado!</Text>
+      </MainScreenScaffold>
+    )
+  }  
+
+  async function handleConversar() {
+    try {
+      const chatId = await abrirChat(book);
+      navigate('chatConversation', { chatId });
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function handleSalvarNaEstante() {
+    try {
+      if (!user) {
+        alert('Voce precisa estar logado para salvar esse anuncio.');
+        return;
+      }
+
+      if (!book.id) {
+        alert('Nao foi possivel encontrar o codigo do anuncio.');
+        return;
+      }
+
+      await set(ref(db, `savedListings/${user.uid}/${book.id}`), {
+        ...book,
+        savedAt: serverTimestamp(),
+      });
+
+      alert('Anuncio salvo na estante.');
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel salvar o anuncio.');
+    }
+  }
+
+  async function handleMarcarComoVendido() {
+    try {
+      if (!user) {
+        alert('Voce precisa estar logado para alterar esse anuncio.');
+        return;
+      }
+
+      if (!isOwner) {
+        alert('Apenas o dono do anuncio pode marcar como negociado.');
+        return;
+      }
+
+      if (!book.id) {
+        alert('Nao foi possivel encontrar o codigo do anuncio.');
+        return;
+      }
+
+      const status = book.dealType === 'troca' ? 'trocado' : 'vendido';
+
+      await set(ref(db, `negotiatedListings/${user.uid}/${book.id}`), {
+        ...book,
+        status,
+        negotiatedAt: serverTimestamp(),
+      });
+
+      await remove(ref(db, `bookListings/${book.id}`));
+      alert('Anuncio movido para negociados.');
+      navigate('discover');
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel remover o anuncio.');
+    }
+  }
 
   return (
     <MainScreenScaffold navigate={navigate} openMenu={openMenu} library headerProfile={false}>
       <View style={[styles.detailCoverFrame, { padding: framePad, marginTop: isCompact ? 24 : 36 }]}>
         <View style={[styles.detailCover, { height: Math.max(220, coverH) }]}>
-          <Text style={styles.detailCoverSmall}>TOM ENCONTRO CONJUNTO DE MANDE</Text>
-          <Text style={styles.detailCoverTitle}>A SOMBRA DO{'\n'}ALQUIMISTA</Text>
-          <View style={styles.detailCoverLines} />
+          {book.imageSource ? (
+            <Image source={{uri: book.imageSource}} style={styles.detailCoverImage} />
+          ) : (
+            <Text style={styles.detailCoverTitle}>{book.title}</Text>
+          )}
         </View>
       </View>
 
       <View style={styles.badgesRow}>
-        <GenrePillTag label="PRIMEIRA EDIÇÃO" />
-        <GenrePillTag label="CAPA DURA" muted />
+        <GenrePillTag label={book.condition?.toUpperCase() || 'ANÚNCIO'}/>
+        <GenrePillTag
+          label={book.status ? book.status.toUpperCase() : book.dealType === 'troca' ? 'TROCA' : `R$ ${book.price}`}
+          muted
+        />
       </View>
 
-      <Text style={styles.detailTitle}>A Sombra do Alquimista</Text>
-      <Text style={styles.detailAuthor}>por Julian Thorne</Text>
-
-      <View style={styles.ratingRow}>
-        {[0, 1, 2, 3].map((item) => (
-          <FontAwesome key={item} name="star" size={18} color={colors.caramel} />
-        ))}
-        <FontAwesome name="star-half-o" size={18} color={colors.caramel} />
-        <Text style={styles.ratingText}>4.8 (124 avaliações)</Text>
-      </View>
+      <Text style={styles.detailTitle}>{book.title}</Text>
+      <Text style={styles.detailAuthor}>por {book.author}</Text>
 
       <View style={styles.genreWrap}>
         <GenrePillTag label="Ficção Histórica" />
@@ -51,29 +132,45 @@ export function BookListingDetailScreen({ navigate, openMenu }) {
       <View style={styles.synopsisCard}>
         <Text style={styles.synopsisTitle}>Sinopse</Text>
         <Text style={styles.synopsisText}>
-          No coração da Veneza do século XV, um mestre artesão descobre um manuscrito oculto que promete os segredos
-          da própria luz. Mas à medida que ele se aprofunda nas sombras da guilda, percebe que algumas verdades devem
-          permanecer enterradas sob a superfície dos canais. Uma história envolvente de ambição, alquimia e o preço da
-          imortalidade.
+          {book.synopsis || 'Sem sinopse informada.'}
+        </Text>
+      </View>
+
+       <View style={styles.synopsisCard}>
+        <Text style={styles.synopsisTitle}>Detalhes</Text>
+        <Text style={styles.synopsisText}>
+          {book.description}
         </Text>
       </View>
 
       <View style={styles.sellerCard}>
-        <UserAvatar initials="OA" color="#0c1d24" size={56} online />
+        <UserAvatar initials={book.userName?.slice(0, 2).toUpperCase()} color="#0c1d24" size={56} online />
         <View style={styles.sellerInfo}>
           <Text style={styles.sellerEyebrow}>VENDEDOR CONFIÁVEL</Text>
-          <Text style={styles.sellerName}>O Arquivista</Text>
+          <Text style={styles.sellerName}>{book.userName}</Text>
           <Text style={styles.sellerMeta}>⊙ Vendedor de Elite</Text>
         </View>
       </View>
 
-      <TouchableOpacity style={styles.chatSellerButton} onPress={() => navigate('chat')}>
-        <Ionicons name="chatbox" size={23} color={colors.white} />
-        <Text style={styles.chatSellerText}>Conversar com o vendedor</Text>
-      </TouchableOpacity>
+      {isNegotiated ? (
+        <TouchableOpacity style={[styles.chatSellerButton, styles.soldButton]} activeOpacity={1} disabled>
+          <Feather name="check-circle" size={23} color={colors.white} />
+          <Text style={styles.chatSellerText}>{negotiatedText}</Text>
+        </TouchableOpacity>
+      ) : isOwner ? (
+        <TouchableOpacity style={[styles.chatSellerButton, styles.soldButton]} onPress={handleMarcarComoVendido}>
+          <Feather name="check-circle" size={23} color={colors.white} />
+          <Text style={styles.chatSellerText}>{ownerActionText}</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity style={styles.chatSellerButton} onPress={handleConversar}>
+          <Ionicons name="chatbox" size={23} color={colors.white} />
+          <Text style={styles.chatSellerText}>Conversar com o vendedor</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.detailActions}>
-        <TouchableOpacity style={styles.saveButton} onPress={() => navigate('details')}>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSalvarNaEstante}>
           <Feather name="bookmark" size={22} color={colors.brown} />
           <Text style={styles.saveButtonText}>Salvar na estante</Text>
         </TouchableOpacity>
@@ -95,6 +192,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...cardShadow,
+  },
+  detailCoverImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   detailCoverSmall: {
     color: colors.greenSoft,
@@ -212,6 +314,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     marginBottom: 18,
     ...cardShadow,
+  },
+  soldButton: {
+    backgroundColor: colors.greenDark,
   },
   chatSellerText: {
     color: colors.white,

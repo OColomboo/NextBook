@@ -1,30 +1,70 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Image, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/appColors';
+import { UserAvatar } from '../community/UserAvatar';
 
-export function BookListCard({ title, author, description, badge, action, color, portrait }) {
+export function BookListCard({
+  title,
+  author,
+  description,
+  badge,
+  action,
+  color,
+  avatar,
+  name,
+  imageSource,
+  onPress,
+  saved = false,
+  onSavePress,
+}) {
+  function handleSavePress(event) {
+    event?.stopPropagation?.();
+    onSavePress?.();
+  }
+
   return (
-    <View style={styles.listBookCard}>
+    <TouchableOpacity style={styles.listBookCard} activeOpacity={0.85} onPress={onPress}>
+      <View style={styles.publisherRow}>
+        <UserAvatar initials={avatar || 'US'} color={colors.brown} size={38} />
+        <View>
+          <Text style={styles.publisherLabel}>PUBLICADO POR</Text>
+          <Text style={styles.publisherName}>{name}</Text>
+        </View>
+      </View>
       <View style={[styles.listBookImage, { backgroundColor: color }]}>
-        {portrait === 'sea' ? <View style={styles.seaLine} /> : <View style={styles.sageFace} />}
+        {imageSource && (
+          <Image source={{ uri: imageSource}} style={styles.listBookPhoto} />
+        )}
       </View>
       <View style={styles.listBookHeader}>
-        <View>
+        <View style={styles.listBookTitleBlock}>
           <Text style={styles.listBookTitle}>{title}</Text>
           <Text style={styles.listBookAuthor}>{author}</Text>
         </View>
-        <Feather name="bookmark" size={22} color={colors.muted} />
+        <TouchableOpacity
+          style={styles.bookmarkButton}
+          activeOpacity={0.75}
+          onPress={handleSavePress}
+          disabled={!onSavePress}
+          hitSlop={10}
+        >
+          <Ionicons
+            name={saved ? 'bookmark' : 'bookmark-outline'}
+            size={24}
+            color={saved ? '#d8a21f' : colors.muted}
+          />
+        </TouchableOpacity>
       </View>
       <Text style={styles.listDescription}>{description}</Text>
       <View style={styles.listBookFooter}>
         <View style={styles.badgeLine}>
-          <View style={[styles.tinyDot, badge === 'VENDEDOR PREMIUM' && styles.redDot]} />
+          <View style={styles.tinyDot} />
           <Text style={styles.badgeText}>{badge}</Text>
         </View>
         <Text style={styles.actionText}>{action}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -42,27 +82,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  seaLine: {
-    width: '120%',
-    height: 76,
-    borderTopWidth: 2,
-    borderTopColor: '#5a6f73',
-    borderBottomWidth: 2,
-    borderBottomColor: '#5a6f73',
-    transform: [{ rotate: '-5deg' }],
+  publisherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
   },
-  sageFace: {
-    width: 98,
-    height: 138,
-    borderRadius: 46,
-    borderWidth: 3,
-    borderColor: '#d0bea2',
-    backgroundColor: '#6d5846',
+  publisherLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  publisherName: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 2,
   },
   listBookHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 12,
+  },
+  listBookTitleBlock: {
+    flex: 1,
+  },
+  bookmarkButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   listBookTitle: {
     color: colors.ink,
@@ -97,18 +148,20 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#836f48',
   },
-  redDot: {
-    backgroundColor: colors.red,
-  },
   badgeText: {
     color: '#6d625c',
-    fontSize: 10,
+    fontSize: 15,
     fontWeight: '900',
     letterSpacing: 0.8,
   },
   actionText: {
     color: colors.brown,
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '900',
   },
+  listBookPhoto: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  }
 });
