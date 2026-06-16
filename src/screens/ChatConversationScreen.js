@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -16,8 +16,12 @@ import { cardShadow } from '../theme/cardShadow';
 import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import { UserAvatar } from '../components/community/UserAvatar';
 import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
+import firebase from '../firebaseConfig';
+import { getAuth } from 'firebase/auth';
+import { getDatabase, ref, onValue, push, set, update, serverTimestamp } from 'firebase/database';
 
-export function ChatConversationScreen({ navigate }) {
+export function ChatConversationScreen({ navigate, routeParams }) {
+  const { chatId } = routeParams || {};
   const { gutterContent, isCompact, width } = useResponsiveLayout();
   const showPhoneAction = width >= 340;
   const avatarSize = isCompact ? 48 : 58;
@@ -25,25 +29,118 @@ export function ChatConversationScreen({ navigate }) {
   const roleSize = isCompact ? 15 : 19;
   const edgeIcon = isCompact ? 28 : 33;
   const contentPad = gutterContent;
+  const [chat, setChat] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [messageText, setMessageText] = useState('');
+  const auth = getAuth(firebase);
+  const db = getDatabase(firebase);
+  const user = auth.currentUser;
+  const isSeller = user?.uid === chat?.sellerId;
+  const otherUserName = isSeller ? chat?.buyerName : chat?.sellerName;
+  const otherUserInitials = otherUserName?.slice(0, 2).toUpperCase() || 'US';
+  const currentDateLabel = new Date()
+    .toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+    .toUpperCase();
+
+  useEffect(() => {
+    if (!chatId) return;
+
+    const chatRef = ref(db, `chats/${chatId}`);
+
+    const unsubscribe = onValue(chatRef, (snapshot) => {
+      setChat(snapshot.val());
+    });
+
+    return () => unsubscribe();
+  }, [chatId]);
+
+  useEffect(() => {
+    if (!chatId || !user) return;
+
+    update(ref(db, `userChats/${user.uid}/${chatId}`), {
+      unread: false,
+    });
+  }, [chatId, user]);
+
+  useEffect(() => {
+    if (!chatId) return;
+
+    const messagesRef = ref(db, `chats/${chatId}/messages`);
+
+    const unsubscribe = onValue(messagesRef, (snapshot) => {
+      const data = snapshot.val();
+
+      if (!data) {
+        setMessages([]);
+        return;
+      }
+
+      const messagesArray = Object.entries(data)
+        .map(([id, message]) => ({ id, ...message }))
+        .sort((a, b) => (a.criadoEm || 0) - (b.criadoEm || 0));
+
+      setMessages(messagesArray);
+    });
+
+    return () => unsubscribe();
+  }, [chatId]);
+
+  async function enviarMensagem() {
+    if (!chatId || !chat || !user) return;
+
+    const text = messageText.trim();
+
+    if (!text) return;
+
+    const messageRef = push(ref(db, `chats/${chatId}/messages`));
+
+    await set(messageRef, {
+      senderId: user.uid,
+      text,
+      criadoEm: serverTimestamp(),
+    });
+
+    await update(ref(db, `chats/${chatId}`), {
+      lastMessage: text,
+      lastSenderId: user.uid,
+      updatedAt: serverTimestamp(),
+    });
+
+    await update(ref(db, `userChats/${chat.sellerId}/${chatId}`), {
+      lastMessage: text,
+      lastSenderId: user.uid,
+      unread: user.uid !== chat.sellerId,
+      updatedAt: serverTimestamp(),
+    });
+
+    await update(ref(db, `userChats/${chat.buyerId}/${chatId}`), {
+      lastMessage: text,
+      lastSenderId: user.uid,
+      unread: user.uid !== chat.buyerId,
+      updatedAt: serverTimestamp(),
+    });
+
+    setMessageText('');
+  }
 
   return (
     <SafeAreaView style={styles.chatScreen}>
       <KeyboardAvoidingView
         style={styles.chatKeyboard}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
         <View style={[styles.chatHeader, { paddingHorizontal: contentPad, minHeight: isCompact ? 72 : 86 }]}>
-          <TouchableOpacity style={styles.headerIcon} onPress={() => navigate('community')}>
+          <TouchableOpacity style={styles.headerIcon} onPress={() => navigate('chat')}>
             <Feather name="arrow-left" size={edgeIcon} color={colors.brownDark} />
           </TouchableOpacity>
-          <UserAvatar initials="JT" color="#bf7a4e" size={avatarSize} online />
+          <UserAvatar initials={otherUserInitials} color="#bf7a4e" size={avatarSize} online />
           <View style={styles.chatIdentity}>
             <Text style={[styles.chatName, { fontSize: 15 }]} numberOfLines={1}>
-              Julian Thorne
+              {otherUserName || 'Usuário'}
             </Text>
             <Text style={[styles.chatRole, { fontSize: 10, lineHeight: roleSize }]} numberOfLines={2}>
-              Especialista em Livros Raros
+              Conversa sobre anúncio
             </Text>
           </View>
 
@@ -58,39 +155,33 @@ export function ChatConversationScreen({ navigate }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={[styles.chatListing, isCompact && styles.chatListingCompact]}>
-            <View style={styles.chatThumb}>
-              <Text style={styles.chatThumbText}>1ª ED.</Text>
-            </View>
-            <View style={[styles.chatListingText, { minWidth: 0 }]}>
-              <Text style={styles.chatListingTitle}>O Alquimista (1ª Ed. 1988)</Text>
-              <Text style={styles.chatListingMeta}>R$ 2.450,00 • Oferta Pendente</Text>
-            </View>
-            <TouchableOpacity style={[styles.adButton, isCompact && styles.adButtonCompact]} onPress={() => navigate('details')}>
-              <Text style={[styles.adButtonText, isCompact && { fontSize: 15 }]}>Ver Anúncio</Text>
-            </TouchableOpacity>
+        <View style={[styles.chatListing, isCompact && styles.chatListingCompact]}>
+          <View style={styles.chatThumb}>
+            <Text style={styles.chatThumbText}>1ª ED.</Text>
           </View>
+          <View style={[styles.chatListingText, { minWidth: 0 }]}>
+            <Text style={styles.chatListingTitle}>{chat?.listingTitle}</Text>
+            <Text style={styles.chatListingMeta}>
+              {chat?.lastMessage || 'Conversa iniciada'}
+            </Text>
+          </View>
+          <TouchableOpacity style={[styles.adButton, isCompact && styles.adButtonCompact]} onPress={() => navigate('details')}>
+            <Text style={[styles.adButtonText, isCompact && { fontSize: 15 }]}>Ver Anúncio</Text>
+          </TouchableOpacity>
+        </View>
 
-          <Text style={[styles.dateChip, isCompact && { paddingHorizontal: 12, letterSpacing: 1 }]}>
-            24 DE OUTUBRO DE 2023
-          </Text>
+        <Text style={[styles.dateChip, isCompact && { paddingHorizontal: 12, letterSpacing: 1 }]}>
+          {currentDateLabel}
+        </Text>
 
-          <ChatMessageBubble incoming time="10:15">
-            Olá! Vi seu interesse na primeira edição de O Alquimista. É um exemplar verdadeiramente notável, com
-            oxidação mínima nas guardas.
+        {messages.map((message) => (
+          <ChatMessageBubble
+            key={message.id}
+            incoming={message.senderId !== user?.uid}
+          >
+            {message.text}
           </ChatMessageBubble>
-          <ChatMessageBubble time="10:18">
-            Obrigado pelo contato, Julian. As fotos parecem excelentes. Notei uma pequena marca na lombada — é um
-            rasgo ou apenas um desgaste superficial?
-          </ChatMessageBubble>
-          <ChatMessageBubble incoming time="10:20">
-            Bem observado! Na verdade, é apenas um desgaste superficial bem pequeno no couro. Subi uma foto macro
-            dessa área específica na galeria do anúncio, caso queira ver melhor. Não chegou a romper a pele.
-          </ChatMessageBubble>
-          <ChatMessageBubble time="10:22">
-            Perfeito, isso tranquiliza. Estou disposto a pagar o valor pedido se você puder incluir o frete com seguro
-            para São Paulo. O que acha?
-          </ChatMessageBubble>
+        ))}
         </ScrollView>
 
         <View style={[styles.typingLine, { paddingHorizontal: contentPad }]}>
@@ -106,10 +197,17 @@ export function ChatConversationScreen({ navigate }) {
           <TouchableOpacity style={[styles.addMessageButton, isCompact && styles.addMessageButtonCompact]}>
             <Feather name="plus" size={isCompact ? 15 : 20} color={colors.brown} />
           </TouchableOpacity>
+          
           <View style={[styles.messageInputWrap, isCompact && styles.messageInputWrapCompact]}>
-            <TextInput style={[styles.messageInput, isCompact && { fontSize: 10 }]} placeholder="..." placeholderTextColor="#b8aea9" />
+            <TextInput style={[styles.messageInput, isCompact && { fontSize: 10 }]}
+              placeholder="..." 
+              placeholderTextColor="#b8aea9" 
+              value={messageText}
+              onChangeText={setMessageText}
+            />
           </View>
-          <TouchableOpacity style={[styles.sendButton, isCompact && styles.sendButtonCompact]}>
+
+          <TouchableOpacity style={[styles.sendButton, isCompact && styles.sendButtonCompact]} onPress={enviarMensagem}>
             <Ionicons name="send" size={isCompact ? 15 : 20} color={colors.white} />
           </TouchableOpacity>
         </View>
@@ -160,7 +258,6 @@ const styles = StyleSheet.create({
   chatListing: {
     backgroundColor: colors.greenWash,
     borderRadius: 20,
-    paddingLeft: 50,
     padding: 20,
     flexDirection: 'column',
     justifyContent: 'center',
@@ -174,6 +271,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   chatThumb: {
+    display: 'none',
     width: 100,
     height: 30,
     borderRadius: 4,
@@ -232,6 +330,7 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   typingLine: {
+    display: 'none',
     height: 24,
     flexDirection: 'row',
     alignItems: 'center',

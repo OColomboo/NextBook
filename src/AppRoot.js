@@ -12,22 +12,26 @@ import { AddBookListingScreen } from './screens/AddBookListingScreen';
 import { BookReviewScreen } from './screens/BookReviewScreen';
 import { BookDetailsScreen } from './screens/BookDetailsScreen';
 import { BookListingDetailScreen } from './screens/BookListingDetailScreen';
+import { ChatListScreen } from './screens/ChatListScreen';
 import { ChatConversationScreen } from './screens/ChatConversationScreen';
 import firebase from './firebaseConfig';
 
 function AppContent() {
   const [screen, setScreen] = useState('login');
+  const [routeParams, setRouteParams] = useState({});
   const [menuOpen, setMenuOpen] = useState(false);
   const { width, webContainerMaxWidth } = useResponsiveLayout();
 
-  const navigate = (nextScreen) => {
+  const navigate = (nextScreen, params = {}) => {
     setScreen(nextScreen);
+    setRouteParams(params);
     setMenuOpen(false);
   };
 
   const sharedProps = {
     navigate,
     openMenu: () => setMenuOpen(true),
+    routeParams,
   };
 
   const webPhoneFrame =
@@ -46,7 +50,9 @@ function AppContent() {
       {screen === 'review' && <BookReviewScreen {...sharedProps} />}
       {screen === 'details' && <BookDetailsScreen {...sharedProps} />}
       {screen === 'bookDetail' && <BookListingDetailScreen {...sharedProps} />}
-      {screen === 'chat' && <ChatConversationScreen {...sharedProps} />}
+    
+      {screen === 'chat' && <ChatListScreen {...sharedProps} />}
+      {screen === 'chatConversation' && <ChatConversationScreen {...sharedProps} />}
       <NavigationDrawerMenu visible={menuOpen} navigate={navigate} onClose={() => setMenuOpen(false)} />
     </View>
   );

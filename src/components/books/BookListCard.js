@@ -1,12 +1,30 @@
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Image, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/appColors';
 import { UserAvatar } from '../community/UserAvatar';
 
-export function BookListCard({ title, author, description, badge, action, color, avatar, name, imageSource}) {
+export function BookListCard({
+  title,
+  author,
+  description,
+  badge,
+  action,
+  color,
+  avatar,
+  name,
+  imageSource,
+  onPress,
+  saved = false,
+  onSavePress,
+}) {
+  function handleSavePress(event) {
+    event?.stopPropagation?.();
+    onSavePress?.();
+  }
+
   return (
-    <View style={styles.listBookCard}>
+    <TouchableOpacity style={styles.listBookCard} activeOpacity={0.85} onPress={onPress}>
       <View style={styles.publisherRow}>
         <UserAvatar initials={avatar || 'US'} color={colors.brown} size={38} />
         <View>
@@ -20,11 +38,23 @@ export function BookListCard({ title, author, description, badge, action, color,
         )}
       </View>
       <View style={styles.listBookHeader}>
-        <View>
+        <View style={styles.listBookTitleBlock}>
           <Text style={styles.listBookTitle}>{title}</Text>
           <Text style={styles.listBookAuthor}>{author}</Text>
         </View>
-        <Feather name="bookmark" size={22} color={colors.muted} />
+        <TouchableOpacity
+          style={styles.bookmarkButton}
+          activeOpacity={0.75}
+          onPress={handleSavePress}
+          disabled={!onSavePress}
+          hitSlop={10}
+        >
+          <Ionicons
+            name={saved ? 'bookmark' : 'bookmark-outline'}
+            size={24}
+            color={saved ? '#d8a21f' : colors.muted}
+          />
+        </TouchableOpacity>
       </View>
       <Text style={styles.listDescription}>{description}</Text>
       <View style={styles.listBookFooter}>
@@ -34,7 +64,7 @@ export function BookListCard({ title, author, description, badge, action, color,
         </View>
         <Text style={styles.actionText}>{action}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -74,6 +104,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 12,
+  },
+  listBookTitleBlock: {
+    flex: 1,
+  },
+  bookmarkButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   listBookTitle: {
     color: colors.ink,
