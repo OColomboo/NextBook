@@ -16,6 +16,7 @@ import { getDatabase, onValue, ref } from 'firebase/database';
 import { colors } from '../../theme/appColors';
 import { cardShadow } from '../../theme/cardShadow';
 import { addComment, deleteComment, updateComment } from './ReviewService';
+import { useResponsiveLayout } from '../../theme/ResponsiveLayoutContext';
 
 function formatCommentDate(value) {
   if (!value) {
@@ -37,6 +38,7 @@ function formatCommentDate(value) {
 }
 
 export function ReviewCommentsModal({ visible, onClose, reviewId, reviewTitle, currentUser }) {
+  const { bottomTabBarHeight } = useResponsiveLayout();
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [editingCommentId, setEditingCommentId] = useState(null);
@@ -149,13 +151,13 @@ export function ReviewCommentsModal({ visible, onClose, reviewId, reviewTitle, c
   }
 
   return (
-    <View style={styles.overlay}>
+    <View style={styles.overlay} pointerEvents="box-none">
       <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
       <KeyboardAvoidingView
         style={styles.keyboardWrap}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.panel}>
+        <View style={[styles.panel, { paddingBottom: bottomTabBarHeight }]}>
           <View style={styles.header}>
             <View style={styles.headerTextWrap}>
               <Text style={styles.title}>Comentarios</Text>
@@ -247,12 +249,12 @@ export function ReviewCommentsModal({ visible, onClose, reviewId, reviewTitle, c
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 50,
+    zIndex: 10,
     justifyContent: 'flex-end',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(35, 27, 22, 0.32)',
+    backgroundColor: 'transparent',
   },
   keyboardWrap: {
     maxHeight: '78%',

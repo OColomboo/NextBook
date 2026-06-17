@@ -45,17 +45,51 @@ function pickCoverUrl(imageLinks = {}) {
   return rawUrl.replace(/^http:/, 'https:');
 }
 
-export async function fetchBookByIsbn(isbnInput) {
-  const isbn = normalizeIsbn(isbnInput);
+function pickOpenLibraryCover(cover = {}) {
+  const rawUrl = cover.large || cover.medium || cover.small || '';
 
-  if (!isbn) {
-    throw new Error('Informe um ISBN valido.');
+  if (!rawUrl) {
+    return '';
   }
 
-  const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+  return rawUrl.replace(/^http:/, 'https:');
+}
+
+function normalizeOpenLibrarySubjects(subjects = []) {
+  return subjects
+    .map((subject) => (typeof subject === 'string' ? subject : subject?.name))
+    .filter(Boolean);
+}
+
+function pickOpenLibraryIsbn(identifiers = {}, fallbackIsbn) {
+  return normalizeIsbn(identifiers.isbn_13?.[0] || identifiers.isbn_10?.[0] || fallbackIsbn);
+}
+
+async function readErrorText(response) {
+  try {
+    return await response.text();
+  } catch (error) {
+    return 'Nao foi possivel ler o corpo da resposta.';
+  }
+}
+
+async function fetchBookByIsbnFromGoogle(isbn) {
+  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(`isbn:${isbn}`)}`;
+  const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error('Nao foi possivel consultar o Google Books.');
+    const errorText = await readErrorText(response);
+
+    console.log('Erro Google Books:', {
+      status: response.status,
+      url,
+      body: errorText,
+    });
+
+    const error = new Error(`Nao foi possivel consultar o Google Books. Status: ${response.status}`);
+    error.status = response.status;
+    error.source = 'Google Books';
+    throw error;
   }
 
   const data = await response.json();
@@ -77,4 +111,63 @@ export async function fetchBookByIsbn(isbnInput) {
     imageSource: pickCoverUrl(info.imageLinks || {}),
     isbn: pickIsbn(info.industryIdentifiers || []) || isbn,
   };
+}
+
+async function fetchBookByIsbnFromOpenLibrary(isbn) {
+  const url = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&jscmd=data&format=json`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const errorText = await readErrorText(response);
+
+    console.log('Erro Open Library:', {
+      status: response.status,
+      url,
+      body: errorText,
+    });
+
+    const error = new Error(`Nao foi possivel consultar a Open Library. Status: ${response.status}`);
+    error.status = response.status;
+    error.source = 'Open Library';
+    throw error;
+  }
+
+  const data = await response.json();
+  const book = data[`ISBN:${isbn}`];
+
+  if (!book) {
+    throw new Error('Nenhum livro encontrado para este ISBN.');
+  }
+
+  const subjects = normalizeOpenLibrarySubjects(book.subjects || []);
+
+  return {
+    title: book.title || '',
+    author: book.authors?.map((author) => author.name).filter(Boolean).join(', ') || '',
+    publisher: book.publishers?.[0]?.name || '',
+    pages: book.number_of_pages ? String(book.number_of_pages) : '',
+    synopsis: book.excerpts?.[0]?.text || '',
+    genre: matchGenreFromCategories(subjects),
+    imageSource: pickOpenLibraryCover(book.cover || {}),
+    isbn: pickOpenLibraryIsbn(book.identifiers || {}, isbn),
+  };
+}
+
+export async function fetchBookByIsbn(isbnInput) {
+  const isbn = normalizeIsbn(isbnInput);
+
+  if (!isbn) {
+    throw new Error('Informe um ISBN valido.');
+  }
+
+  try {
+    return await fetchBookByIsbnFromGoogle(isbn);
+  } catch (googleError) {
+    console.log('Google Books falhou, tentando Open Library:', {
+      status: googleError.status,
+      message: googleError.message,
+    });
+  }
+
+  return await fetchBookByIsbnFromOpenLibrary(isbn);
 }

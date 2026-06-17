@@ -1,5 +1,5 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
 import { AppHeaderBar } from './AppHeaderBar';
 import { BottomTabBar } from './BottomTabBar';
 import { colors } from '../../theme/appColors';
@@ -8,6 +8,7 @@ import { useResponsiveLayout } from '../../theme/ResponsiveLayoutContext';
 export function MainScreenScaffold({
   active,
   children,
+  overlay,
   navigate,
   openMenu,
   library = false,
@@ -35,6 +36,7 @@ export function MainScreenScaffold({
       >
         {children}
       </ScrollView>
+      {overlay ? <View style={styles.overlayHost} pointerEvents="box-none">{overlay}</View> : null}
       <BottomTabBar active={active} navigate={navigate} library={library} />
     </SafeAreaView>
   );
@@ -49,4 +51,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {},
+  overlayHost: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
+  },
 });

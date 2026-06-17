@@ -37,6 +37,9 @@ async function updateChatPreview(db, chatId, chat, senderId, previewText) {
       otherUserName: participantId === chat.sellerId ? chat.buyerName : chat.sellerName,
       listingTitle: chat.listingTitle,
       listingImage: chat.listingImage,
+      listingPrice: chat.listingPrice || '',
+      listingDealType: chat.listingDealType || '',
+      listingStatus: chat.listingStatus || '',
       lastMessage: previewText,
       lastSenderId: senderId,
       unread: senderId !== participantId,
@@ -191,12 +194,18 @@ export async function abrirChat(book) {
     const sellerName = book.userName || 'Usuario';
     const listingTitle = book.title || 'Anuncio sem titulo';
     const listingImage = book.imageSource || '';
+    const listingPrice = book.price || '';
+    const listingDealType = book.dealType || '';
+    const listingStatus = book.status || '';
     const initialMessage = `Ola! Tenho interesse no anuncio "${listingTitle}".`;
 
     await set(chatRef, {
       listingId: book.id,
       listingTitle,
       listingImage,
+      listingPrice,
+      listingDealType,
+      listingStatus,
       sellerId: book.userId,
       sellerName,
       buyerId: user.uid,
@@ -222,6 +231,9 @@ export async function abrirChat(book) {
       otherUserName: sellerName,
       listingTitle,
       listingImage,
+      listingPrice,
+      listingDealType,
+      listingStatus,
       lastMessage: initialMessage,
       lastSenderId: user.uid,
       unread: false,
@@ -232,6 +244,9 @@ export async function abrirChat(book) {
       otherUserName: buyerName,
       listingTitle,
       listingImage,
+      listingPrice,
+      listingDealType,
+      listingStatus,
       lastMessage: initialMessage,
       lastSenderId: user.uid,
       unread: true,

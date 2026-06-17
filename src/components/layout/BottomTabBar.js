@@ -65,6 +65,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 30,
+    elevation: 30,
     paddingTop: 8,
     backgroundColor: colors.cream,
     borderTopWidth: 1,

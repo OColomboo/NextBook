@@ -5,6 +5,7 @@ import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { CommunityPostCard } from '../components/community/CommunityPostCard';
 import { ReviewCommentsModal } from '../components/community/ReviewCommentsModal';
 import { ChatActionsMenu } from '../components/chat/ChatActionsMenu';
+import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import {
   deleteReview,
   getCommentsCount,
@@ -15,6 +16,7 @@ import { getDatabase, onValue, ref } from 'firebase/database';
 import { getAuth } from 'firebase/auth';
 
 export function CommunityFeedScreen({ navigate, openMenu }) {
+  const { bottomTabBarHeight } = useResponsiveLayout();
   const [reviews, setReviews] = useState([]);
   const [commentsModalReview, setCommentsModalReview] = useState(null);
   const [menuReview, setMenuReview] = useState(null);
@@ -91,7 +93,30 @@ export function CommunityFeedScreen({ navigate, openMenu }) {
     : [];
 
   return (
-    <MainScreenScaffold active="community" navigate={navigate} openMenu={openMenu}>
+    <MainScreenScaffold
+      active="community"
+      navigate={navigate}
+      openMenu={openMenu}
+      overlay={
+        <>
+          <ReviewCommentsModal
+            visible={Boolean(commentsModalReview)}
+            onClose={() => setCommentsModalReview(null)}
+            reviewId={commentsModalReview?.id}
+            reviewTitle={commentsModalReview?.bookname}
+            currentUser={user}
+          />
+
+          <ChatActionsMenu
+            visible={Boolean(menuReview)}
+            onClose={() => setMenuReview(null)}
+            title="Opcoes da avaliacao"
+            actions={menuActions}
+            bottomOffset={bottomTabBarHeight}
+          />
+        </>
+      }
+    >
       <Text style={styles.pageTitle}>Comunidade</Text>
       <Text style={styles.pageSubtitle}>Explore as opinioes literarias dos usuarios do NextBook.</Text>
 
@@ -137,20 +162,6 @@ export function CommunityFeedScreen({ navigate, openMenu }) {
         );
       })}
 
-      <ReviewCommentsModal
-        visible={Boolean(commentsModalReview)}
-        onClose={() => setCommentsModalReview(null)}
-        reviewId={commentsModalReview?.id}
-        reviewTitle={commentsModalReview?.bookname}
-        currentUser={user}
-      />
-
-      <ChatActionsMenu
-        visible={Boolean(menuReview)}
-        onClose={() => setMenuReview(null)}
-        title="Opcoes da avaliacao"
-        actions={menuActions}
-      />
     </MainScreenScaffold>
   );
 }

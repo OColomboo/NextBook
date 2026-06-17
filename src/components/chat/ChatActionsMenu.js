@@ -3,7 +3,13 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/appColors';
 import { cardShadow } from '../../theme/cardShadow';
 
-export function ChatActionsMenu({ visible, onClose, actions = [], title = 'Opcoes da conversa' }) {
+export function ChatActionsMenu({
+  visible,
+  onClose,
+  actions = [],
+  title = 'Opcoes da conversa',
+  bottomOffset = 0,
+}) {
   if (!visible) {
     return null;
   }
@@ -11,7 +17,7 @@ export function ChatActionsMenu({ visible, onClose, actions = [], title = 'Opcoe
   return (
     <View style={styles.menuOverlay}>
       <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={onClose} />
-      <View style={styles.menuPanel}>
+      <View style={[styles.menuPanel, { paddingBottom: bottomOffset + 28 }]}>
         <Text style={styles.menuTitle}>{title}</Text>
         {actions.map((action) => (
           <TouchableOpacity
@@ -47,7 +53,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
     paddingHorizontal: 20,
     paddingTop: 18,
-    paddingBottom: 28,
     backgroundColor: colors.white,
     ...cardShadow,
   },

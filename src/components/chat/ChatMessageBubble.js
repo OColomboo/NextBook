@@ -7,7 +7,11 @@ export function ChatMessageBubble({ incoming = false, time, type, imageUrl, chil
 
   return (
     <View style={[styles.messageWrap, incoming ? styles.incomingWrap : styles.outgoingWrap]}>
-      <View style={[styles.messageBubble, incoming ? styles.incomingBubble : styles.outgoingBubble]}>
+      <View style={[
+        styles.messageBubble,
+        isImage && styles.imageBubble,
+        incoming ? styles.incomingBubble : styles.outgoingBubble,
+      ]}>
         {isImage ? (
           <Image source={{ uri: imageUrl }} style={styles.messageImage} resizeMode="cover" />
         ) : (
@@ -24,8 +28,8 @@ export function ChatMessageBubble({ incoming = false, time, type, imageUrl, chil
 
 const styles = StyleSheet.create({
   messageWrap: {
-    marginBottom: 10,
-    maxWidth: '86%',
+    marginBottom: 8,
+    maxWidth: '82%',
   },
   incomingWrap: {
     alignSelf: 'flex-start',
@@ -34,10 +38,14 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   messageBubble: {
-    borderRadius: 20,
-    paddingHorizontal: 28,
-    paddingVertical: 26,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     overflow: 'hidden',
+  },
+  imageBubble: {
+    paddingHorizontal: 6,
+    paddingVertical: 6,
   },
   incomingBubble: {
     backgroundColor: colors.white,
@@ -54,17 +62,17 @@ const styles = StyleSheet.create({
   },
   messageText: {
     color: colors.ink,
-    fontSize: 18,
-    lineHeight: 26,
+    fontSize: 15,
+    lineHeight: 21,
   },
   outgoingText: {
     color: colors.white,
   },
   messageTime: {
     color: '#695f59',
-    fontSize: 16,
-    marginTop: 8,
-    marginLeft: 14,
+    fontSize: 11,
+    marginTop: 4,
+    marginLeft: 10,
   },
   outgoingTime: {
     alignSelf: 'flex-end',

@@ -51,6 +51,27 @@ function resolveTimestamp(value) {
   return Date.now();
 }
 
+function formatListingMeta(book, chat) {
+  const status = book?.status || chat?.listingStatus;
+  const dealType = String(book?.dealType || chat?.listingDealType || '').toLowerCase();
+  const price = book?.price || chat?.listingPrice;
+
+  if (status) {
+    return String(status).toUpperCase();
+  }
+
+  if (dealType === 'troca') {
+    return 'TROCA';
+  }
+
+  if (price) {
+    const priceText = String(price);
+    return priceText.includes('R$') ? priceText : `R$ ${priceText}`;
+  }
+
+  return 'ANUNCIO';
+}
+
 export function ChatConversationScreen({ navigate, routeParams }) {
   const { chatId } = routeParams || {};
   const { gutterContent, isCompact, width } = useResponsiveLayout();
@@ -68,6 +89,7 @@ export function ChatConversationScreen({ navigate, routeParams }) {
   const [profileData, setProfileData] = useState(null);
   const [sendingAttachment, setSendingAttachment] = useState(false);
   const [loadingListing, setLoadingListing] = useState(false);
+  const [listingDetails, setListingDetails] = useState(null);
   const typingDebounceRef = useRef(null);
   const auth = getAuth(firebase);
   const db = getDatabase(firebase);
@@ -79,6 +101,9 @@ export function ChatConversationScreen({ navigate, routeParams }) {
   const currentDateLabel = new Date()
     .toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
     .toUpperCase();
+  const listingTitle = listingDetails?.title || chat?.listingTitle || 'Anuncio';
+  const listingImage = listingDetails?.imageSource || chat?.listingImage;
+  const listingMeta = formatListingMeta(listingDetails, chat);
 
   useEffect(() => {
     if (!chatId) return;
@@ -99,6 +124,35 @@ export function ChatConversationScreen({ navigate, routeParams }) {
       unread: false,
     });
   }, [chatId, user, db]);
+
+  useEffect(() => {
+    if (!chat?.listingId) {
+      setListingDetails(null);
+      return undefined;
+    }
+
+    let active = true;
+
+    async function loadListingDetails() {
+      try {
+        const book = await fetchListingForChat(chat.listingId, chat.sellerId);
+
+        if (active) {
+          setListingDetails(book);
+        }
+      } catch (error) {
+        if (active) {
+          setListingDetails(null);
+        }
+      }
+    }
+
+    loadListingDetails();
+
+    return () => {
+      active = false;
+    };
+  }, [chat?.listingId, chat?.sellerId]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -377,26 +431,26 @@ export function ChatConversationScreen({ navigate, routeParams }) {
           keyboardShouldPersistTaps="handled"
         >
           <View style={[styles.chatListing, isCompact && styles.chatListingCompact]}>
-            {chat?.listingImage ? (
-              <Image source={{ uri: chat.listingImage }} style={styles.chatListingImage} />
+            {listingImage ? (
+              <Image source={{ uri: listingImage }} style={styles.chatListingImage} />
             ) : (
               <View style={styles.chatListingFallback}>
                 <Feather name="book-open" size={24} color={colors.brown} />
               </View>
             )}
             <View style={[styles.chatListingText, { minWidth: 0 }]}>
-              <Text style={styles.chatListingTitle}>{chat?.listingTitle}</Text>
-              <Text style={styles.chatListingMeta}>Anuncio vinculado</Text>
+              <Text style={styles.chatListingTitle} numberOfLines={2}>{listingTitle}</Text>
+              <Text style={styles.chatListingMeta}>{listingMeta}</Text>
+              <TouchableOpacity
+                style={[styles.adButton, isCompact && styles.adButtonCompact]}
+                onPress={handleVerAnuncio}
+                disabled={loadingListing}
+              >
+                <Text style={[styles.adButtonText, isCompact && { fontSize: 13 }]}>
+                  {loadingListing ? 'Carregando...' : 'Ver anuncio'}
+                </Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[styles.adButton, isCompact && styles.adButtonCompact]}
-              onPress={handleVerAnuncio}
-              disabled={loadingListing}
-            >
-              <Text style={[styles.adButtonText, isCompact && { fontSize: 15 }]}>
-                {loadingListing ? 'Carregando...' : 'Ver Anuncio'}
-              </Text>
-            </TouchableOpacity>
           </View>
 
           <Text style={[styles.dateChip, isCompact && { paddingHorizontal: 12, letterSpacing: 1 }]}>
@@ -509,69 +563,72 @@ const styles = StyleSheet.create({
   },
   chatListing: {
     backgroundColor: colors.greenWash,
-    borderRadius: 20,
-    padding: 20,
-    flexDirection: 'column',
-    justifyContent: 'center',
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 14,
-    marginBottom: 48,
+    alignSelf: 'center',
+    width: '86%',
+    maxWidth: 340,
+    gap: 12,
+    marginBottom: 34,
     ...cardShadow,
   },
   chatListingCompact: {
-    padding: 16,
+    width: '92%',
+    padding: 10,
   },
   chatListingImage: {
-    width: 72,
-    height: 96,
+    width: 58,
+    height: 78,
     borderRadius: 6,
     backgroundColor: colors.paperStrong,
+    flexShrink: 0,
   },
   chatListingFallback: {
-    width: 72,
-    height: 96,
+    width: 58,
+    height: 78,
     borderRadius: 6,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.line,
+    flexShrink: 0,
   },
   chatListingText: {
     flex: 1,
-    minWidth: 100,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   chatListingTitle: {
     color: colors.brownDark,
-    fontSize: 16,
-    lineHeight: 22,
-    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: '800',
   },
   chatListingMeta: {
-    color: '#5f5751',
-    fontSize: 14,
-    lineHeight: 22,
-    textAlign: 'center',
+    color: colors.brown,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '900',
+    marginTop: 3,
   },
   adButton: {
-    borderRadius: 30,
+    borderRadius: 16,
     backgroundColor: colors.peach,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    flexShrink: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
+    alignSelf: 'flex-start',
   },
   adButtonCompact: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    width: '100%',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     alignItems: 'center',
   },
   adButtonText: {
     color: colors.brown,
-    fontSize: 17,
+    fontSize: 13,
     fontWeight: '900',
   },
   dateChip: {
