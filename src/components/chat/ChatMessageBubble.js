@@ -1,12 +1,18 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../theme/appColors';
 
-export function ChatMessageBubble({ incoming = false, time, children }) {
+export function ChatMessageBubble({ incoming = false, time, type, imageUrl, children }) {
+  const isImage = type === 'image' && imageUrl;
+
   return (
     <View style={[styles.messageWrap, incoming ? styles.incomingWrap : styles.outgoingWrap]}>
       <View style={[styles.messageBubble, incoming ? styles.incomingBubble : styles.outgoingBubble]}>
-        <Text style={[styles.messageText, !incoming && styles.outgoingText]}>{children}</Text>
+        {isImage ? (
+          <Image source={{ uri: imageUrl }} style={styles.messageImage} resizeMode="cover" />
+        ) : (
+          <Text style={[styles.messageText, !incoming && styles.outgoingText]}>{children}</Text>
+        )}
       </View>
       <Text style={[styles.messageTime, !incoming && styles.outgoingTime]}>
         {time}
@@ -31,6 +37,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 28,
     paddingVertical: 26,
+    overflow: 'hidden',
   },
   incomingBubble: {
     backgroundColor: colors.white,
@@ -39,6 +46,11 @@ const styles = StyleSheet.create({
   outgoingBubble: {
     backgroundColor: colors.brown,
     borderBottomRightRadius: 0,
+  },
+  messageImage: {
+    width: 220,
+    height: 220,
+    borderRadius: 12,
   },
   messageText: {
     color: colors.ink,

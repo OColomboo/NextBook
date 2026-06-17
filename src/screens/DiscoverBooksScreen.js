@@ -1,5 +1,5 @@
-import React, {useEffect, useState} from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { getAuth } from 'firebase/auth';
 import { colors } from '../theme/appColors';
@@ -7,14 +7,22 @@ import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { GenrePillTag } from '../components/books/GenrePillTag';
 import { BookListCard } from '../components/books/BookListCard';
+import { toggleSavedListing } from '../components/books/ListingService';
 import firebase from '../firebaseConfig';
-import { getDatabase, ref, onValue, serverTimestamp, set } from 'firebase/database';
+import { getDatabase, onValue, ref } from 'firebase/database';
+import {
+  discoverGenreFilters,
+  listingMatchesGenre,
+  listingMatchesSearch,
+} from '../utils/listingFilters';
 
 export function DiscoverBooksScreen({ navigate, openMenu }) {
   const { isCompact } = useResponsiveLayout();
   const titleSize = isCompact ? 26 : 31;
   const [bookListings, setBookListings] = useState([]);
   const [savedListingIds, setSavedListingIds] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [genreFilter, setGenreFilter] = useState('all');
   const auth = getAuth(firebase);
   const db = getDatabase(firebase);
   const user = auth.currentUser;
@@ -31,18 +39,17 @@ export function DiscoverBooksScreen({ navigate, openMenu }) {
       }
 
       const listingsArray = Object.entries(data)
-      .map(([id, listing]) => ({
-        id,
-        ...listing
-      }))
-      .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
-    
+        .map(([id, listing]) => ({
+          id,
+          ...listing,
+        }))
+        .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
+
       setBookListings(listingsArray);
     });
 
     return () => unsubscribe();
-    
-  },[db]);
+  }, [db]);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -64,7 +71,15 @@ export function DiscoverBooksScreen({ navigate, openMenu }) {
     return () => unsubscribe();
   }, [db, user?.uid]);
 
-  async function handleSaveListing(book) {
+  const filteredListings = useMemo(
+    () =>
+      bookListings.filter(
+        (book) => listingMatchesSearch(book, searchTerm) && listingMatchesGenre(book, genreFilter),
+      ),
+    [bookListings, searchTerm, genreFilter],
+  );
+
+  async function handleToggleSave(book) {
     try {
       if (!user) {
         alert('Voce precisa estar logado para salvar anuncios.');
@@ -76,60 +91,76 @@ export function DiscoverBooksScreen({ navigate, openMenu }) {
         return;
       }
 
-      await set(ref(db, `savedListings/${user.uid}/${book.id}`), {
-        ...book,
-        savedAt: serverTimestamp(),
-      });
+      const isSaved = Boolean(savedListingIds[book.id]);
+      await toggleSavedListing(user.uid, book, isSaved);
 
-      setSavedListingIds((current) => ({
-        ...current,
-        [book.id]: true,
-      }));
+      setSavedListingIds((current) => {
+        const next = { ...current };
+
+        if (isSaved) {
+          delete next[book.id];
+        } else {
+          next[book.id] = true;
+        }
+
+        return next;
+      });
     } catch (error) {
-      alert(error.message || 'Nao foi possivel salvar o anuncio.');
+      alert(error.message || 'Nao foi possivel atualizar a estante.');
     }
   }
 
   return (
     <MainScreenScaffold active="discover" navigate={navigate} openMenu={openMenu} library headerProfile={false}>
-      <Text style={[styles.discoverTitle, { fontSize: titleSize, lineHeight: titleSize + 8 }]}>Descubra seu próximo capítulo.</Text>
+      <Text style={[styles.discoverTitle, { fontSize: titleSize, lineHeight: titleSize + 8 }]}>
+        Descubra seu proximo capitulo.
+      </Text>
 
       <View style={styles.searchBox}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar por título, autor ou ISBN..."
+          placeholder="Buscar por titulo, autor ou ISBN..."
           placeholderTextColor="#89909e"
+          value={searchTerm}
+          onChangeText={setSearchTerm}
         />
         <Feather name="book-open" size={22} color={colors.muted} />
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillRow}>
-        <GenrePillTag label="Todos os Gêneros" active />
-        <GenrePillTag label="Ficção" />
-        <GenrePillTag label="Filosofia" />
-        <GenrePillTag label="História" />
-        <GenrePillTag label="Fantasia" />
-        <GenrePillTag label="Romance" />
-        <GenrePillTag label="Infanto-juvenil"/>
+        {discoverGenreFilters.map((filter) => (
+          <GenrePillTag
+            key={filter.key}
+            label={filter.label}
+            active={genreFilter === filter.key}
+            onPress={() => setGenreFilter(filter.key)}
+          />
+        ))}
       </ScrollView>
 
-      {bookListings.map((book) => (
-        <BookListCard
-        key={book.id}
-        avatar={book.userName?.slice(0, 2).toUpperCase() || 'US'}
-        name={book.userName}
-        title={book.title}
-        author={book.author}
-        description={book.description || book.synopsis}
-        badge={book.condition?.toUpperCase()|| 'ANÚNCIO'}
-        action={book.dealType === 'troca' ? 'TROCA' : `R$ ${book.price}`}
-        imageSource={book.imageSource}
-        onPress={() => navigate('bookDetail', { book })}
-        saved={Boolean(savedListingIds[book.id])}
-        onSavePress={() => handleSaveListing(book)}
-        />
-      ))}
-
+      {filteredListings.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Feather name="search" size={24} color={colors.muted} />
+          <Text style={styles.emptyText}>Nenhum anuncio encontrado com esses filtros.</Text>
+        </View>
+      ) : (
+        filteredListings.map((book) => (
+          <BookListCard
+            key={book.id}
+            avatar={book.userName?.slice(0, 2).toUpperCase() || 'US'}
+            name={book.userName}
+            title={book.title}
+            author={book.author}
+            description={book.description || book.synopsis}
+            badge={book.condition?.toUpperCase() || 'ANUNCIO'}
+            action={book.dealType === 'troca' ? 'TROCA' : `R$ ${book.price}`}
+            imageSource={book.imageSource}
+            onPress={() => navigate('bookDetail', { book })}
+            saved={Boolean(savedListingIds[book.id])}
+            onSavePress={() => handleToggleSave(book)}
+          />
+        ))
+      )}
     </MainScreenScaffold>
   );
 }
@@ -157,83 +188,16 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingBottom: 20,
   },
-  featureBookCard: {
-    borderRadius: 7,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceWarm,
-    borderWidth: 1,
-    borderColor: colors.greenSoft,
-    marginBottom: 28,
-  },
-  Cover: {
-    height: 220,
-    backgroundColor: '#08100d',
+  emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 40,
+    gap: 12,
   },
-  coverRibbon: {
-    position: 'absolute',
-    top: 14,
-    left: 14,
-    color: colors.white,
-    backgroundColor: colors.brown,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
-    overflow: 'hidden',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  CoverText: {
-    color: colors.caramel,
-    fontSize: 32,
-    lineHeight: 34,
-    fontWeight: '900',
+  emptyText: {
+    color: colors.muted,
+    fontSize: 15,
     textAlign: 'center',
-  },
-  bookCardBody: {
-    padding: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  bookTitle: {
-    color: colors.ink,
-    fontSize: 19,
-    fontWeight: '800',
-  },
-  bookAuthor: {
-    color: '#6f665f',
-    fontSize: 14,
-    marginTop: 3,
-  },
-  priceText: {
-    color: colors.brownDark,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  bookCardFooter: {
-    borderTopWidth: 1,
-    borderTopColor: colors.line,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sellerHandle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  handleText: {
-    color: '#706863',
-    fontSize: 12,
     fontWeight: '700',
-  },
-  detailsLink: {
-    color: colors.brown,
-    fontWeight: '900',
   },
 });

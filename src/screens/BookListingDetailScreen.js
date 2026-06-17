@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/appColors';
@@ -8,11 +8,13 @@ import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { GenrePillTag } from '../components/books/GenrePillTag';
 import { UserAvatar } from '../components/community/UserAvatar';
 import { abrirChat } from '../components/chat/ChatService';
+import { toggleSavedListing } from '../components/books/ListingService';
+import { getListingMetaTags, shareListing } from '../utils/listingShare';
 import firebase from '../firebaseConfig';
 import { getAuth } from 'firebase/auth';
-import { getDatabase, ref, remove, serverTimestamp, set } from 'firebase/database';
+import { getDatabase, onValue, ref, remove, serverTimestamp, set } from 'firebase/database';
 
-export function BookListingDetailScreen({ navigate, openMenu, routeParams}) {
+export function BookListingDetailScreen({ navigate, openMenu, routeParams }) {
   const { gutterContent, isCompact, width } = useResponsiveLayout();
   const framePad = Math.max(16, Math.min(36, Math.round(gutterContent * 1.15)));
   const scrollInnerW = width - 2 * gutterContent;
@@ -22,18 +24,34 @@ export function BookListingDetailScreen({ navigate, openMenu, routeParams}) {
   const auth = getAuth(firebase);
   const db = getDatabase(firebase);
   const user = auth.currentUser;
+  const [isSaved, setIsSaved] = useState(false);
   const isOwner = user?.uid === book?.userId;
   const ownerActionText = book?.dealType === 'troca' ? 'Marcar como trocado' : 'Marcar como vendido';
   const isNegotiated = Boolean(book?.status);
   const negotiatedText = book?.status === 'trocado' ? 'Anuncio trocado' : 'Anuncio vendido';
+  const metaTags = getListingMetaTags(book);
+
+  useEffect(() => {
+    if (!user?.uid || !book?.id) {
+      setIsSaved(false);
+      return undefined;
+    }
+
+    const savedRef = ref(db, `savedListings/${user.uid}/${book.id}`);
+    const unsubscribe = onValue(savedRef, (snapshot) => {
+      setIsSaved(snapshot.exists());
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid, book?.id, db]);
 
   if (!book) {
     return (
       <MainScreenScaffold navigate={navigate} openMenu={openMenu} library headerProfile={false}>
-        <Text style={styles.detailTitle}>Anúncio não encontrado!</Text>
+        <Text style={styles.detailTitle}>Anuncio nao encontrado!</Text>
       </MainScreenScaffold>
-    )
-  }  
+    );
+  }
 
   async function handleConversar() {
     try {
@@ -44,7 +62,7 @@ export function BookListingDetailScreen({ navigate, openMenu, routeParams}) {
     }
   }
 
-  async function handleSalvarNaEstante() {
+  async function handleToggleSave() {
     try {
       if (!user) {
         alert('Voce precisa estar logado para salvar esse anuncio.');
@@ -56,14 +74,18 @@ export function BookListingDetailScreen({ navigate, openMenu, routeParams}) {
         return;
       }
 
-      await set(ref(db, `savedListings/${user.uid}/${book.id}`), {
-        ...book,
-        savedAt: serverTimestamp(),
-      });
-
-      alert('Anuncio salvo na estante.');
+      await toggleSavedListing(user.uid, book, isSaved);
+      setIsSaved(!isSaved);
     } catch (error) {
-      alert(error.message || 'Nao foi possivel salvar o anuncio.');
+      alert(error.message || 'Nao foi possivel atualizar a estante.');
+    }
+  }
+
+  async function handleShare() {
+    try {
+      await shareListing(book);
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel compartilhar o anuncio.');
     }
   }
 
@@ -105,7 +127,7 @@ export function BookListingDetailScreen({ navigate, openMenu, routeParams}) {
       <View style={[styles.detailCoverFrame, { padding: framePad, marginTop: isCompact ? 24 : 36 }]}>
         <View style={[styles.detailCover, { height: Math.max(220, coverH) }]}>
           {book.imageSource ? (
-            <Image source={{uri: book.imageSource}} style={styles.detailCoverImage} />
+            <Image source={{ uri: book.imageSource }} style={styles.detailCoverImage} />
           ) : (
             <Text style={styles.detailCoverTitle}>{book.title}</Text>
           )}
@@ -113,7 +135,7 @@ export function BookListingDetailScreen({ navigate, openMenu, routeParams}) {
       </View>
 
       <View style={styles.badgesRow}>
-        <GenrePillTag label={book.condition?.toUpperCase() || 'ANÚNCIO'}/>
+        <GenrePillTag label={book.condition?.toUpperCase() || 'ANUNCIO'} />
         <GenrePillTag
           label={book.status ? book.status.toUpperCase() : book.dealType === 'troca' ? 'TROCA' : `R$ ${book.price}`}
           muted
@@ -124,33 +146,43 @@ export function BookListingDetailScreen({ navigate, openMenu, routeParams}) {
       <Text style={styles.detailAuthor}>por {book.author}</Text>
 
       <View style={styles.genreWrap}>
-        <GenrePillTag label="Ficção Histórica" />
-        <GenrePillTag label="Mistério" />
-        <GenrePillTag label="Renascimento" />
+        {metaTags.length > 0 ? (
+          metaTags.map((tag) => (
+            <GenrePillTag key={tag.key} label={tag.label} muted={tag.muted} />
+          ))
+        ) : (
+          <Text style={styles.metaFallback}>Genero nao informado.</Text>
+        )}
       </View>
 
       <View style={styles.synopsisCard}>
         <Text style={styles.synopsisTitle}>Sinopse</Text>
-        <Text style={styles.synopsisText}>
-          {book.synopsis || 'Sem sinopse informada.'}
-        </Text>
+        <Text style={styles.synopsisText}>{book.synopsis || 'Sem sinopse informada.'}</Text>
       </View>
 
-       <View style={styles.synopsisCard}>
+      <View style={styles.synopsisCard}>
         <Text style={styles.synopsisTitle}>Detalhes</Text>
-        <Text style={styles.synopsisText}>
-          {book.description}
-        </Text>
+        <Text style={styles.synopsisText}>{book.description}</Text>
       </View>
 
       <View style={styles.sellerCard}>
         <UserAvatar initials={book.userName?.slice(0, 2).toUpperCase()} color="#0c1d24" size={56} online />
         <View style={styles.sellerInfo}>
-          <Text style={styles.sellerEyebrow}>VENDEDOR CONFIÁVEL</Text>
+          <Text style={styles.sellerEyebrow}>VENDEDOR CONFIAVEL</Text>
           <Text style={styles.sellerName}>{book.userName}</Text>
-          <Text style={styles.sellerMeta}>⊙ Vendedor de Elite</Text>
+          <Text style={styles.sellerMeta}>Vendedor de Elite</Text>
         </View>
       </View>
+
+      {isOwner && !isNegotiated ? (
+        <TouchableOpacity
+          style={[styles.chatSellerButton, styles.editButton]}
+          onPress={() => navigate('add', { listingId: book.id })}
+        >
+          <Feather name="edit-2" size={23} color={colors.white} />
+          <Text style={styles.chatSellerText}>Editar anuncio</Text>
+        </TouchableOpacity>
+      ) : null}
 
       {isNegotiated ? (
         <TouchableOpacity style={[styles.chatSellerButton, styles.soldButton]} activeOpacity={1} disabled>
@@ -170,11 +202,13 @@ export function BookListingDetailScreen({ navigate, openMenu, routeParams}) {
       )}
 
       <View style={styles.detailActions}>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSalvarNaEstante}>
+        <TouchableOpacity style={styles.saveButton} onPress={handleToggleSave}>
           <Feather name="bookmark" size={22} color={colors.brown} />
-          <Text style={styles.saveButtonText}>Salvar na estante</Text>
+          <Text style={styles.saveButtonText}>
+            {isSaved ? 'Remover da estante' : 'Salvar na estante'}
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.shareButton}>
+        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
           <Feather name="share-2" size={22} color={colors.brown} />
         </TouchableOpacity>
       </View>
@@ -198,13 +232,6 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
-  detailCoverSmall: {
-    color: colors.greenSoft,
-    fontSize: 9,
-    letterSpacing: 2,
-    position: 'absolute',
-    top: 35,
-  },
   detailCoverTitle: {
     color: colors.greenWash,
     fontSize: 28,
@@ -212,13 +239,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '300',
     letterSpacing: 1.2,
-  },
-  detailCoverLines: {
-    position: 'absolute',
-    bottom: 70,
-    width: 180,
-    height: 1,
-    backgroundColor: colors.greenSoft,
   },
   badgesRow: {
     flexDirection: 'row',
@@ -238,22 +258,16 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginBottom: 24,
   },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginBottom: 24,
-  },
-  ratingText: {
-    color: '#5f5952',
-    fontWeight: '800',
-    marginLeft: 10,
-  },
   genreWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
     marginBottom: 34,
+  },
+  metaFallback: {
+    color: colors.muted,
+    fontSize: 15,
+    fontStyle: 'italic',
   },
   synopsisCard: {
     backgroundColor: colors.greenWash,
@@ -314,6 +328,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     marginBottom: 18,
     ...cardShadow,
+  },
+  editButton: {
+    backgroundColor: colors.brownDark,
   },
   soldButton: {
     backgroundColor: colors.greenDark,

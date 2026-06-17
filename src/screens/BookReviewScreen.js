@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { colors } from '../theme/appColors';
@@ -6,9 +6,9 @@ import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { FormField, FormOutlineField, FormSelectField, formStyles } from '../components/forms/FormFields';
 import firebase from '../firebaseConfig';
 import { getAuth } from 'firebase/auth';
-import { getDatabase, ref as dbRef, push, set, get, serverTimestamp} from 'firebase/database';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL} from  'firebase/storage';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
+import { createReview, fetchReview, updateReview } from '../components/community/ReviewService';
 
 export const bookGenres = [
   'Ficção Literária',
@@ -27,60 +27,127 @@ export const bookGenres = [
   'Clássicos',
   'HQ / Mangá',
   'Internacional',
-]
+];
 
-export function BookReviewScreen({ navigate, openMenu }) {
+export function BookReviewScreen({ navigate, openMenu, routeParams }) {
+  const reviewId = routeParams?.reviewId;
+  const isEditing = Boolean(reviewId);
+
   const [bookname, setBookname] = useState('');
   const [author, setAuthor] = useState('');
+  const [publisher, setPublisher] = useState('');
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
   const [coverImage, setCoverImage] = useState(null);
+  const [existingImageSource, setExistingImageSource] = useState('');
+  const [coverImageChanged, setCoverImageChanged] = useState(false);
   const [genre, setGenre] = useState('Ficção Literária');
-  
+  const [loadingReview, setLoadingReview] = useState(isEditing);
+  const [submitting, setSubmitting] = useState(false);
+
   const auth = getAuth(firebase);
-  const db = getDatabase(firebase);
   const storage = getStorage(firebase);
 
-  async function publicarAvaliacao(){
+  useEffect(() => {
+    if (!reviewId) {
+      return;
+    }
+
+    let active = true;
+
+    async function loadReview() {
+      setLoadingReview(true);
+
+      try {
+        const review = await fetchReview(reviewId);
+
+        if (!review) {
+          alert('Avaliacao nao encontrada.');
+          navigate('community');
+          return;
+        }
+
+        if (!active) {
+          return;
+        }
+
+        setBookname(review.bookname || '');
+        setAuthor(review.author || '');
+        setPublisher(review.publisher || '');
+        setRating(review.rating || 0);
+        setReviewText(review.text || '');
+        setGenre(review.genre || 'Ficção Literária');
+        setExistingImageSource(review.imageSource || '');
+        setCoverImage(review.imageSource || null);
+        setCoverImageChanged(false);
+      } catch (error) {
+        alert(error.message || 'Nao foi possivel carregar a avaliacao.');
+        navigate('community');
+      } finally {
+        if (active) {
+          setLoadingReview(false);
+        }
+      }
+    }
+
+    loadReview();
+
+    return () => {
+      active = false;
+    };
+  }, [reviewId]);
+
+  async function handleSubmit() {
     const user = auth.currentUser;
-    
-    if(!user){
-      alert('Você precisa estar logado para publicar!');
+
+    if (!user) {
+      alert('Voce precisa estar logado para publicar!');
       return;
     }
-    
-    const imageSource = await uploadCoverImage(user.uid);
 
-    if(!bookname.trim() || !reviewText.trim() || rating === 0){
-      alert('Você precisa preencher todos os campos para postar sua review!');
+    if (!bookname.trim() || !reviewText.trim() || rating === 0) {
+      alert('Voce precisa preencher todos os campos para postar sua review!');
       return;
     }
-    const userSnapshot = await get(dbRef(db,'usuarios/' + user.uid))
-    const userData = userSnapshot.val();
 
-    const novaReviewRef = push(dbRef(db, 'reviews'));
+    setSubmitting(true);
 
-    await set(novaReviewRef, {
-      userId: user.uid,
-      userName: userData?.nome || user.displayName || 'usuario',
-      bookname,
-      author,
-      genre,
-      text: reviewText,
-      rating,
-      likes: 0,
-      imageSource,
-      comments: 0,
-      criadoEm: serverTimestamp(),
-    })
-    navigate ('community');
+    try {
+      let imageSource = existingImageSource;
+
+      if (coverImageChanged && coverImage) {
+        imageSource = await uploadCoverImage(user.uid);
+      }
+
+      const payload = {
+        bookname: bookname.trim(),
+        author: author.trim(),
+        publisher: publisher.trim(),
+        genre,
+        text: reviewText.trim(),
+        rating,
+        imageSource,
+      };
+
+      if (isEditing) {
+        await updateReview(reviewId, user.uid, payload);
+      } else {
+        await createReview(user, payload);
+      }
+
+      navigate('community');
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel salvar a avaliacao.');
+    } finally {
+      setSubmitting(false);
+    }
   }
-  
-  async function escolherImagem(){
+
+  async function escolherImagem() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if(!permission.granted){
-      alert('Permita acesso à galeria para escolher uma imagem.');
+    if (!permission.granted) {
+      alert('Permita acesso a galeria para escolher uma imagem.');
       return;
     }
 
@@ -91,16 +158,17 @@ export function BookReviewScreen({ navigate, openMenu }) {
       quality: 0.8,
     });
 
-    if(!result.canceled){
+    if (!result.canceled) {
       setCoverImage(result.assets[0].uri);
+      setCoverImageChanged(true);
     }
   }
 
-  async function tirarFoto(){
+  async function tirarFoto() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
 
-    if(!permission.granted){
-      alert('Permita acesso à câmera para tirar uma foto');
+    if (!permission.granted) {
+      alert('Permita acesso a camera para tirar uma foto');
       return;
     }
 
@@ -110,16 +178,18 @@ export function BookReviewScreen({ navigate, openMenu }) {
       aspect: [3, 4],
       quality: 0.8,
     });
-    
-    if (!result.canceled){
+
+    if (!result.canceled) {
       setCoverImage(result.assets[0].uri);
+      setCoverImageChanged(true);
     }
   }
 
   async function uploadCoverImage(userId) {
-    if (!coverImage){
+    if (!coverImage) {
       return '';
     }
+
     const response = await fetch(coverImage);
     const blob = await response.blob();
 
@@ -128,23 +198,32 @@ export function BookReviewScreen({ navigate, openMenu }) {
     return await getDownloadURL(fileRef);
   }
 
+  if (loadingReview) {
+    return (
+      <MainScreenScaffold active="review" navigate={navigate} openMenu={openMenu} headerSearch={false}>
+        <Text style={styles.reviewTitle}>Carregando avaliacao...</Text>
+      </MainScreenScaffold>
+    );
+  }
+
   return (
     <MainScreenScaffold active="review" navigate={navigate} openMenu={openMenu} headerSearch={false}>
-      <Text style={styles.reviewEyebrow}>CURADORIA LITERÁRIA</Text>
-      <Text style={styles.reviewTitle}>Avaliar Nova Leitura</Text>
+      <Text style={styles.reviewEyebrow}>CURADORIA LITERARIA</Text>
+      <Text style={styles.reviewTitle}>{isEditing ? 'Editar avaliacao' : 'Avaliar Nova Leitura'}</Text>
       <Text style={styles.reviewSubtitle}>
-        Leu um livro e gostou? Compartilhe com a comunidade!
+        {isEditing
+          ? 'Atualize sua opiniao sobre esta obra.'
+          : 'Leu um livro e gostou? Compartilhe com a comunidade!'}
       </Text>
 
       <View style={styles.reviewUpload}>
         {coverImage ? (
-          <Image source={{ uri: coverImage}} style={styles.coverPreview}/>
-          ) : (
+          <Image source={{ uri: coverImage }} style={styles.coverPreview} />
+        ) : (
           <View style={styles.reviewBookCover}>
-            <View style={styles.reviewBookShape}/>
+            <View style={styles.reviewBookShape} />
           </View>
-          )
-        }
+        )}
 
         <Text style={formStyles.uploadLabelStrong}> CAPA DO LIVRO </Text>
         <Text style={formStyles.uploadHint}>Formatos suportados: JPG, PNG, JPEG</Text>
@@ -162,36 +241,36 @@ export function BookReviewScreen({ navigate, openMenu }) {
 
       <View style={formStyles.softPanel}>
         <Text style={formStyles.panelHeading}>METADADOS</Text>
-        <FormField label="EDITORA" placeholder="Ex: Companhia das Letras" />
-        <FormSelectField 
-        label="GÊNERO" 
-        value={genre}
-        options={bookGenres}
-        onChange={setGenre}/>
+        <FormField
+          label="EDITORA"
+          placeholder="Ex: Companhia das Letras"
+          value={publisher}
+          onChangeText={setPublisher}
+        />
+        <FormSelectField label="GENERO" value={genre} options={bookGenres} onChange={setGenre} />
       </View>
 
       <View style={formStyles.reviewFormPanel}>
-        <FormOutlineField 
-        label="NOME DO LIVRO" 
-        placeholder="Título completo da obra" 
-        value={bookname}
-        onChangeText={setBookname}
+        <FormOutlineField
+          label="NOME DO LIVRO"
+          placeholder="Titulo completo da obra"
+          value={bookname}
+          onChangeText={setBookname}
         />
 
         <FormOutlineField
-        label="AUTOR(A)" 
-        placeholder="Nome do autor" 
-        value={author}
-        onChangeText={setAuthor}
+          label="AUTOR(A)"
+          placeholder="Nome do autor"
+          value={author}
+          onChangeText={setAuthor}
         />
 
-        {/* avaliação com estrelas */}
-        <Text style={styles.ratingLabel}>SUA AVALIAÇÃO</Text>
+        <Text style={styles.ratingLabel}>SUA AVALIACAO</Text>
         <View style={styles.starsRow}>
           {[1, 2, 3, 4, 5].map((star) => (
             <TouchableOpacity key={star} onPress={() => setRating(star)}>
               <FontAwesome
-                name = {star <= rating ? 'star' : 'star-o'}
+                name={star <= rating ? 'star' : 'star-o'}
                 size={37}
                 color={colors.brownDark}
               />
@@ -200,19 +279,22 @@ export function BookReviewScreen({ navigate, openMenu }) {
         </View>
 
         <FormOutlineField
-          label="SUA OPINIÃO"
-          placeholder="O que achou da narrativa? Como foi a experiência de leitura?"
+          label="SUA OPINIAO"
+          placeholder="O que achou da narrativa? Como foi a experiencia de leitura?"
           multiline
           height={278}
           value={reviewText}
           onChangeText={setReviewText}
         />
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={[formStyles.formSubmitButton, formStyles.centerSubmit]}
-          onPress={publicarAvaliacao}
-          >
-          <Text style={formStyles.formSubmitText}>PUBLICAR AVALIAÇÃO</Text>
+          onPress={handleSubmit}
+          disabled={submitting}
+        >
+          <Text style={formStyles.formSubmitText}>
+            {submitting ? 'SALVANDO...' : isEditing ? 'SALVAR ALTERACOES' : 'PUBLICAR AVALIACAO'}
+          </Text>
         </TouchableOpacity>
       </View>
     </MainScreenScaffold>
@@ -281,18 +363,18 @@ const styles = StyleSheet.create({
     height: 242,
     borderRadius: 5,
   },
-  photoButtons:{
+  photoButtons: {
     flexDirection: 'row',
     gap: 10,
     marginTop: 18,
   },
-  photoButton:{
+  photoButton: {
     backgroundColor: colors.brown,
     borderRadius: 6,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  photoButtonText:{
+  photoButtonText: {
     color: colors.white,
     fontSize: 11,
     fontWeight: '900',

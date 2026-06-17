@@ -9,6 +9,8 @@ import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { GenrePillTag } from '../components/books/GenrePillTag';
 import { BookListCard } from '../components/books/BookListCard';
+import { toggleSavedListing } from '../components/books/ListingService';
+import { listingMatchesSearch } from '../utils/listingFilters';
 
 function mapFirebaseList(value) {
   if (!value) return [];
@@ -54,24 +56,6 @@ function getActionLabel(book) {
   return price.includes('R$') ? price : `R$ ${price}`;
 }
 
-function listingMatchesSearch(book, searchTerm) {
-  if (!searchTerm.trim()) return true;
-
-  const query = searchTerm.trim().toLowerCase();
-  const searchableText = [
-    book?.title,
-    book?.author,
-    book?.description,
-    book?.synopsis,
-    book?.userName,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
-  return searchableText.includes(query);
-}
-
 function EmptySection({ text }) {
   return (
     <View style={styles.emptyCard}>
@@ -81,7 +65,19 @@ function EmptySection({ text }) {
   );
 }
 
-function ListingSection({ title, hint, items, emptyText, actionLabel, onAction, onOpenBook }) {
+function ListingSection({
+  title,
+  hint,
+  items,
+  emptyText,
+  actionLabel,
+  onAction,
+  onOpenBook,
+  onSavePress,
+  saved = false,
+  showEditAction = false,
+  onEditBook,
+}) {
   return (
     <View style={styles.sectionBlock}>
       <View style={styles.sectionHead}>
@@ -96,19 +92,27 @@ function ListingSection({ title, hint, items, emptyText, actionLabel, onAction, 
 
       {items.length > 0 ? (
         items.map((book) => (
-          <BookListCard
-            key={book.id}
-            title={book.title || 'Livro sem titulo'}
-            author={book.author || 'Autor nao informado'}
-            description={book.description || book.synopsis || 'Sem descricao informada.'}
-            badge={book.condition?.toUpperCase() || 'ANUNCIO'}
-            action={getActionLabel(book)}
-            color={colors.greenDark}
-            avatar={getInitials(book.userName)}
-            name={book.userName || 'Usuario'}
-            imageSource={book.imageSource}
-            onPress={onOpenBook ? () => onOpenBook(book) : undefined}
-          />
+          <View key={book.id}>
+            <BookListCard
+              title={book.title || 'Livro sem titulo'}
+              author={book.author || 'Autor nao informado'}
+              description={book.description || book.synopsis || 'Sem descricao informada.'}
+              badge={book.condition?.toUpperCase() || 'ANUNCIO'}
+              action={getActionLabel(book)}
+              color={colors.greenDark}
+              avatar={getInitials(book.userName)}
+              name={book.userName || 'Usuario'}
+              imageSource={book.imageSource}
+              onPress={onOpenBook ? () => onOpenBook(book) : undefined}
+              saved={saved}
+              onSavePress={onSavePress ? () => onSavePress(book) : undefined}
+            />
+            {showEditAction && onEditBook ? (
+              <TouchableOpacity style={styles.editLink} onPress={() => onEditBook(book)}>
+                <Text style={styles.sectionLink}>Editar anuncio</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         ))
       ) : (
         <EmptySection text={emptyText} />
@@ -192,6 +196,22 @@ export function BookDetailsScreen({ navigate, openMenu }) {
     navigate('bookDetail', { book });
   }
 
+  async function handleUnsave(book) {
+    if (!user?.uid || !book?.id) {
+      return;
+    }
+
+    try {
+      await toggleSavedListing(user.uid, book, true);
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel remover o anuncio salvo.');
+    }
+  }
+
+  function handleEditListing(book) {
+    navigate('add', { listingId: book.id });
+  }
+
   return (
     <MainScreenScaffold active="details" navigate={navigate} openMenu={openMenu} library headerProfile={false}>
       <Text style={[styles.pageTitle, { fontSize: titleSize, lineHeight: titleSize + 8 }]}>Sua estante</Text>
@@ -246,6 +266,8 @@ export function BookDetailsScreen({ navigate, openMenu }) {
           actionLabel="+ Anunciar"
           onAction={() => navigate('add')}
           onOpenBook={openBook}
+          showEditAction
+          onEditBook={handleEditListing}
         />
       )}
 
@@ -258,6 +280,8 @@ export function BookDetailsScreen({ navigate, openMenu }) {
           actionLabel="+ Anunciar"
           onAction={() => navigate('add')}
           onOpenBook={openBook}
+          showEditAction
+          onEditBook={handleEditListing}
         />
       )}
 
@@ -268,6 +292,8 @@ export function BookDetailsScreen({ navigate, openMenu }) {
           items={filteredSavedListings}
           emptyText="Voce ainda nao salvou nenhum anuncio."
           onOpenBook={openBook}
+          saved
+          onSavePress={handleUnsave}
         />
       )}
 
@@ -388,5 +414,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  editLink: {
+    alignSelf: 'flex-end',
+    marginTop: -18,
+    marginBottom: 18,
   },
 });

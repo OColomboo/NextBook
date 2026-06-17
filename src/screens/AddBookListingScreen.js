@@ -1,19 +1,31 @@
-import React, { use, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../theme/appColors';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { FormField, FormSelectField, formStyles } from '../components/forms/FormFields';
 import firebase from '../firebaseConfig';
-import { getAuth, reauthenticateWithRedirect } from 'firebase/auth';
-import { getDatabase, ref, set, get, push, serverTimestamp } from 'firebase/database';
-import { bookGenres } from './BookReviewScreen';
+import { getAuth } from 'firebase/auth';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
+import { bookGenres } from './BookReviewScreen';
+import {
+  createListing,
+  fetchListing,
+  updateListing,
+} from '../components/books/ListingService';
+import { fetchBookByIsbn } from '../services/BookApiService';
 
-export function AddBookListingScreen({ navigate, openMenu }) {
-  const [condition, setCondition] = useState('Novo');
-  const [dealType, setDealType] = useState('Venda');
+function isRemoteUrl(value) {
+  return /^https?:\/\//i.test(String(value || ''));
+}
+
+export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
+  const listingId = routeParams?.listingId;
+  const isEditing = Boolean(listingId);
+
+  const [condition, setCondition] = useState('novo');
+  const [dealType, setDealType] = useState('venda');
   const [price, setPrice] = useState('');
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
@@ -22,88 +34,192 @@ export function AddBookListingScreen({ navigate, openMenu }) {
   const [genre, setGenre] = useState('');
   const [synopsis, setSynopsis] = useState('');
   const [description, setDescription] = useState('');
+  const [isbn, setIsbn] = useState('');
   const [coverImage, setCoverImage] = useState('');
+  const [existingImageSource, setExistingImageSource] = useState('');
+  const [coverImageChanged, setCoverImageChanged] = useState(false);
+  const [loadingListing, setLoadingListing] = useState(isEditing);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchingIsbn, setFetchingIsbn] = useState(false);
 
   const auth = getAuth(firebase);
-  const db = getDatabase(firebase);
   const storage = getStorage(firebase);
 
-  async function criarAnuncio() {
+  useEffect(() => {
+    if (!listingId) {
+      return undefined;
+    }
+
+    let active = true;
+
+    async function loadListing() {
+      setLoadingListing(true);
+
+      try {
+        const listing = await fetchListing(listingId);
+
+        if (!listing) {
+          alert('Anuncio nao encontrado.');
+          navigate('discover');
+          return;
+        }
+
+        if (!active) {
+          return;
+        }
+
+        setCondition(String(listing.condition || 'novo').toLowerCase());
+        setDealType(String(listing.dealType || 'venda').toLowerCase());
+        setPrice(listing.price || '');
+        setTitle(listing.title || '');
+        setAuthor(listing.author || '');
+        setPublisher(listing.publisher || '');
+        setPages(listing.pages ? String(listing.pages) : '');
+        setGenre(listing.genre || '');
+        setSynopsis(listing.synopsis || '');
+        setDescription(listing.description || '');
+        setIsbn(listing.isbn || '');
+        setExistingImageSource(listing.imageSource || '');
+        setCoverImage(listing.imageSource || '');
+        setCoverImageChanged(false);
+      } catch (error) {
+        alert(error.message || 'Nao foi possivel carregar o anuncio.');
+        navigate('discover');
+      } finally {
+        if (active) {
+          setLoadingListing(false);
+        }
+      }
+    }
+
+    loadListing();
+
+    return () => {
+      active = false;
+    };
+  }, [listingId]);
+
+  async function handleSubmit() {
     const user = auth.currentUser;
 
     if (!user) {
-      alert('Você precisa estar logado para anunciar um livro!');
+      alert('Voce precisa estar logado para anunciar um livro!');
       return;
     }
 
     if (!title.trim()) {
-      alert("Você precisa informar o nome do livro!");
+      alert('Voce precisa informar o nome do livro!');
       return;
     }
 
     if (!author.trim()) {
-      alert("Você precisa informar o nome do autor!");
+      alert('Voce precisa informar o nome do autor!');
       return;
     }
 
     if (!description.trim()) {
-      alert("Você precisa informar a descrição do livro!");
+      alert('Voce precisa informar a descricao do livro!');
       return;
     }
 
     if (dealType === 'venda' && !price.trim()) {
-      alert('Você precisa informar o preço do livro!');
+      alert('Voce precisa informar o preco do livro!');
       return;
     }
 
-    const userSnapshot = await get(ref(db, 'usuarios/' + user.uid));
-    const userData = userSnapshot.val();
-    const novoAnuncioRef = push(ref(db, 'bookListings'));
-    const imageSource = await uploadCoverImage(user.uid);
+    setSubmitting(true);
 
-    await set(novoAnuncioRef, {
-      userId: user.uid,
-      userName: userData?.nome || user.displayName || 'usuário',
-      condition,
-      dealType,
-      price,
-      title,
-      author,
-      publisher,
-      genre,
-      pages,
-      synopsis,
-      description,
-      imageSource,
-      criadoEm: serverTimestamp(),
-    });
+    try {
+      let imageSource = existingImageSource;
 
-    alert('Anúncio criado com sucesso!');
-    navigate('discover');
+      if (coverImageChanged && coverImage) {
+        imageSource = await uploadCoverImage(user.uid);
+      } else if (!coverImageChanged && coverImage) {
+        imageSource = coverImage;
+      }
+
+      const payload = {
+        condition,
+        dealType,
+        price,
+        title: title.trim(),
+        author: author.trim(),
+        publisher: publisher.trim(),
+        genre,
+        pages,
+        synopsis,
+        description: description.trim(),
+        imageSource,
+        isbn: isbn.trim(),
+      };
+
+      if (isEditing) {
+        await updateListing(listingId, user.uid, payload);
+        alert('Anuncio atualizado com sucesso!');
+      } else {
+        await createListing(user, payload);
+        alert('Anuncio criado com sucesso!');
+      }
+
+      navigate('discover');
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel salvar o anuncio.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleFetchByIsbn() {
+    setFetchingIsbn(true);
+
+    try {
+      const bookData = await fetchBookByIsbn(isbn);
+
+      if (bookData.title) setTitle(bookData.title);
+      if (bookData.author) setAuthor(bookData.author);
+      if (bookData.publisher) setPublisher(bookData.publisher);
+      if (bookData.pages) setPages(bookData.pages);
+      if (bookData.synopsis) setSynopsis(bookData.synopsis);
+      if (bookData.genre) setGenre(bookData.genre);
+      if (bookData.isbn) setIsbn(bookData.isbn);
+
+      if (bookData.imageSource) {
+        setCoverImage(bookData.imageSource);
+        setCoverImageChanged(false);
+      }
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel buscar o livro.');
+    } finally {
+      setFetchingIsbn(false);
+    }
   }
 
   async function escolherImagem() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      alert('Permita acesso à galeria para escolher uma imagem!');
+      alert('Permita acesso a galeria para escolher uma imagem!');
       return;
     }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [3, 4],
       quality: 0.8,
     });
+
     if (!result.canceled) {
       setCoverImage(result.assets[0].uri);
+      setCoverImageChanged(true);
     }
   }
+
   async function tirarFoto() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
 
     if (!permission.granted) {
-      alert('Permita o acesso à camera para tirar uma foto!');
+      alert('Permita o acesso a camera para tirar uma foto!');
       return;
     }
 
@@ -113,37 +229,50 @@ export function AddBookListingScreen({ navigate, openMenu }) {
       aspect: [3, 4],
       quality: 0.8,
     });
+
     if (!result.canceled) {
       setCoverImage(result.assets[0].uri);
+      setCoverImageChanged(true);
     }
   }
+
   async function uploadCoverImage(userId) {
     if (!coverImage) {
       return '';
     }
 
+    if (isRemoteUrl(coverImage)) {
+      return coverImage.replace(/^http:/, 'https:');
+    }
+
     const response = await fetch(coverImage);
     const blob = await response.blob();
-
     const fileRef = storageRef(storage, `listing-covers/${userId}/${Date.now()}.jpg`);
-    await uploadBytes(fileRef, blob);
 
+    await uploadBytes(fileRef, blob);
     return await getDownloadURL(fileRef);
+  }
+
+  if (loadingListing) {
+    return (
+      <MainScreenScaffold active="add" navigate={navigate} openMenu={openMenu} headerSearch={false}>
+        <Text style={styles.addTitle}>Carregando anuncio...</Text>
+      </MainScreenScaffold>
+    );
   }
 
   return (
     <MainScreenScaffold active="add" navigate={navigate} openMenu={openMenu} headerSearch={false}>
-      <Text style={styles.addTitle}>Anunciar livro</Text>
+      <Text style={styles.addTitle}>{isEditing ? 'Editar anuncio' : 'Anunciar livro'}</Text>
       <Text style={styles.addSubtitle}>
-        Preencha os campos abaixo para criar um anúncio do seu livro.
+        {isEditing
+          ? 'Atualize as informacoes do seu anuncio.'
+          : 'Preencha os campos abaixo para criar um anuncio do seu livro.'}
       </Text>
 
       <View style={formStyles.uploadCoverLarge}>
         {coverImage ? (
-          <Image
-            source={{ uri: coverImage }}
-            style={styles.coverPreview}
-          />
+          <Image source={{ uri: coverImage }} style={styles.coverPreview} />
         ) : (
           <>
             <Feather name="camera" size={34} color={colors.muted} />
@@ -152,18 +281,35 @@ export function AddBookListingScreen({ navigate, openMenu }) {
         )}
 
         <View style={styles.photoButtons}>
-          <TouchableOpacity style={styles.photoButtons} onPress={tirarFoto}>
+          <TouchableOpacity style={styles.photoButton} onPress={tirarFoto}>
             <Text style={styles.photoButtonsText}>Tirar foto</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.photoButtons} onPress={escolherImagem}>
+          <TouchableOpacity style={styles.photoButton} onPress={escolherImagem}>
             <Text style={styles.photoButtonsText}>Escolher da galeria</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={formStyles.softPanel}>
-        <Text style={formStyles.formLabel}>FORMA DE NEGOCIAÇÃO</Text>
+        <FormField
+          label="ISBN"
+          placeholder="9788535910159"
+          value={isbn}
+          onChangeText={setIsbn}
+          keyboardType="numeric"
+        />
+        <TouchableOpacity
+          style={[styles.isbnButton, fetchingIsbn && styles.isbnButtonDisabled]}
+          onPress={handleFetchByIsbn}
+          disabled={fetchingIsbn}
+        >
+          <Text style={styles.isbnButtonText}>
+            {fetchingIsbn ? 'BUSCANDO...' : 'BUSCAR LIVRO POR ISBN'}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={formStyles.formLabel}>FORMA DE NEGOCIACAO</Text>
         <View style={formStyles.segmented}>
           <TouchableOpacity
             style={[formStyles.segment, dealType === 'venda' && formStyles.segmentActive]}
@@ -204,6 +350,7 @@ export function AddBookListingScreen({ navigate, openMenu }) {
             </Text>
           </TouchableOpacity>
         </View>
+
         {dealType === 'venda' && (
           <FormField
             label="Valor (R$)"
@@ -223,12 +370,7 @@ export function AddBookListingScreen({ navigate, openMenu }) {
           onChangeText={setTitle}
         />
 
-        <FormField
-          label="AUTOR"
-          placeholder="Paulo Coelho"
-          value={author}
-          onChangeText={setAuthor}
-        />
+        <FormField label="AUTOR" placeholder="Paulo Coelho" value={author} onChangeText={setAuthor} />
 
         <FormField
           label="EDITORA"
@@ -237,42 +379,43 @@ export function AddBookListingScreen({ navigate, openMenu }) {
           onChangeText={setPublisher}
         />
 
-        <FormSelectField
-          label="GÊNERO"
-          value={genre}
-          options={bookGenres}
-          onChange={setGenre}
-        />
+        <FormSelectField label="GENERO" value={genre} options={bookGenres} onChange={setGenre} />
 
         <FormField
-          label="Nº DE PÁGINAS"
+          label="N DE PAGINAS"
           placeholder="208"
           value={pages}
           onChangeText={setPages}
           keyboardType="numeric"
-
         />
 
         <FormField
           label="BREVE RESUMO / SINOPSE"
-          placeholder="Uma breve introdução à obra..."
-          multiline height={95}
+          placeholder="Uma breve introducao a obra..."
+          multiline
+          height={95}
           value={synopsis}
           onChangeText={setSynopsis}
         />
 
         <FormField
-          label="DESCRIÇÃO DA UNIDADE"
-          placeholder="Descreva o estado físico, dedicatórias ou detalhes específicos do seu exemplar..."
+          label="DESCRICAO DA UNIDADE"
+          placeholder="Descreva o estado fisico, dedicatorias ou detalhes especificos do seu exemplar..."
           value={description}
           onChangeText={setDescription}
           multiline
           height={132}
         />
+
         <View style={formStyles.alignRight}>
           <TouchableOpacity
-            style={formStyles.formSubmitButton} onPress={criarAnuncio}>
-            <Text style={formStyles.formSubmitText}>ANUNCIAR</Text>
+            style={formStyles.formSubmitButton}
+            onPress={handleSubmit}
+            disabled={submitting}
+          >
+            <Text style={formStyles.formSubmitText}>
+              {submitting ? 'SALVANDO...' : isEditing ? 'SALVAR ALTERACOES' : 'ANUNCIAR'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -304,7 +447,7 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 18,
   },
-  PhotoButton: {
+  photoButton: {
     backgroundColor: colors.brown,
     borderRadius: 6,
     paddingHorizontal: 14,
@@ -314,5 +457,22 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 11,
     fontWeight: '900',
+  },
+  isbnButton: {
+    backgroundColor: colors.greenDark,
+    borderRadius: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
+    alignItems: 'center',
+  },
+  isbnButtonDisabled: {
+    opacity: 0.7,
+  },
+  isbnButtonText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

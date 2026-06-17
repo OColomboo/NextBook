@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -11,31 +13,67 @@ import {
   View,
 } from 'react-native';
 import { Entypo, Feather, Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../theme/appColors';
 import { cardShadow } from '../theme/cardShadow';
 import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import { UserAvatar } from '../components/community/UserAvatar';
 import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
+import { ChatActionsMenu } from '../components/chat/ChatActionsMenu';
+import { ChatUserProfileModal } from '../components/chat/ChatUserProfileModal';
+import {
+  blockUser,
+  clearTyping,
+  deleteChatForUser,
+  fetchListingForChat,
+  fetchUserProfile,
+  reportUser,
+  sendImageMessage,
+  sendTextMessage,
+  setTyping,
+} from '../components/chat/ChatService';
 import firebase from '../firebaseConfig';
 import { getAuth } from 'firebase/auth';
-import { getDatabase, ref, onValue, push, set, update, serverTimestamp } from 'firebase/database';
+import { getDatabase, onValue, ref, update } from 'firebase/database';
+
+const TYPING_STALE_MS = 3000;
+const TYPING_DEBOUNCE_MS = 2500;
+
+function resolveTimestamp(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  return Date.now();
+}
 
 export function ChatConversationScreen({ navigate, routeParams }) {
   const { chatId } = routeParams || {};
   const { gutterContent, isCompact, width } = useResponsiveLayout();
-  const showPhoneAction = width >= 340;
   const avatarSize = isCompact ? 48 : 58;
-  const nameSize = isCompact ? 20 : 27;
   const roleSize = isCompact ? 15 : 19;
   const edgeIcon = isCompact ? 28 : 33;
   const contentPad = gutterContent;
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [profileVisible, setProfileVisible] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileData, setProfileData] = useState(null);
+  const [sendingAttachment, setSendingAttachment] = useState(false);
+  const [loadingListing, setLoadingListing] = useState(false);
+  const typingDebounceRef = useRef(null);
   const auth = getAuth(firebase);
   const db = getDatabase(firebase);
   const user = auth.currentUser;
   const isSeller = user?.uid === chat?.sellerId;
+  const otherUserId = isSeller ? chat?.buyerId : chat?.sellerId;
   const otherUserName = isSeller ? chat?.buyerName : chat?.sellerName;
   const otherUserInitials = otherUserName?.slice(0, 2).toUpperCase() || 'US';
   const currentDateLabel = new Date()
@@ -52,7 +90,7 @@ export function ChatConversationScreen({ navigate, routeParams }) {
     });
 
     return () => unsubscribe();
-  }, [chatId]);
+  }, [chatId, db]);
 
   useEffect(() => {
     if (!chatId || !user) return;
@@ -60,7 +98,7 @@ export function ChatConversationScreen({ navigate, routeParams }) {
     update(ref(db, `userChats/${user.uid}/${chatId}`), {
       unread: false,
     });
-  }, [chatId, user]);
+  }, [chatId, user, db]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -83,7 +121,67 @@ export function ChatConversationScreen({ navigate, routeParams }) {
     });
 
     return () => unsubscribe();
-  }, [chatId]);
+  }, [chatId, db]);
+
+  useEffect(() => {
+    if (!chatId || !otherUserId) {
+      setOtherUserTyping(false);
+      return undefined;
+    }
+
+    const typingRef = ref(db, `chats/${chatId}/typing/${otherUserId}`);
+
+    const unsubscribe = onValue(typingRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setOtherUserTyping(false);
+        return;
+      }
+
+      const timestamp = resolveTimestamp(snapshot.val());
+      setOtherUserTyping(Boolean(timestamp && Date.now() - timestamp < TYPING_STALE_MS));
+    });
+
+    return () => unsubscribe();
+  }, [chatId, otherUserId, db]);
+
+  useEffect(() => {
+    return () => {
+      if (typingDebounceRef.current) {
+        clearTimeout(typingDebounceRef.current);
+      }
+
+      if (chatId && user?.uid) {
+        clearTyping(chatId, user.uid);
+      }
+    };
+  }, [chatId, user?.uid]);
+
+  function scheduleClearTyping() {
+    if (typingDebounceRef.current) {
+      clearTimeout(typingDebounceRef.current);
+    }
+
+    typingDebounceRef.current = setTimeout(() => {
+      if (chatId && user?.uid) {
+        clearTyping(chatId, user.uid);
+      }
+    }, TYPING_DEBOUNCE_MS);
+  }
+
+  function handleMessageChange(text) {
+    setMessageText(text);
+
+    if (!chatId || !user?.uid) {
+      return;
+    }
+
+    if (text.trim()) {
+      setTyping(chatId, user.uid);
+      scheduleClearTyping();
+    } else {
+      clearTyping(chatId, user.uid);
+    }
+  }
 
   async function enviarMensagem() {
     if (!chatId || !chat || !user) return;
@@ -92,36 +190,159 @@ export function ChatConversationScreen({ navigate, routeParams }) {
 
     if (!text) return;
 
-    const messageRef = push(ref(db, `chats/${chatId}/messages`));
-
-    await set(messageRef, {
-      senderId: user.uid,
-      text,
-      criadoEm: serverTimestamp(),
-    });
-
-    await update(ref(db, `chats/${chatId}`), {
-      lastMessage: text,
-      lastSenderId: user.uid,
-      updatedAt: serverTimestamp(),
-    });
-
-    await update(ref(db, `userChats/${chat.sellerId}/${chatId}`), {
-      lastMessage: text,
-      lastSenderId: user.uid,
-      unread: user.uid !== chat.sellerId,
-      updatedAt: serverTimestamp(),
-    });
-
-    await update(ref(db, `userChats/${chat.buyerId}/${chatId}`), {
-      lastMessage: text,
-      lastSenderId: user.uid,
-      unread: user.uid !== chat.buyerId,
-      updatedAt: serverTimestamp(),
-    });
-
+    await clearTyping(chatId, user.uid);
+    await sendTextMessage(chatId, chat, user, text);
     setMessageText('');
   }
+
+  async function handleVerAnuncio() {
+    if (!chat?.listingId) {
+      alert('Nao foi possivel encontrar o anuncio desta conversa.');
+      return;
+    }
+
+    setLoadingListing(true);
+
+    try {
+      const book = await fetchListingForChat(chat.listingId, chat.sellerId);
+
+      if (!book) {
+        alert('Este anuncio nao esta mais disponivel.');
+        return;
+      }
+
+      navigate('bookDetail', { book });
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel abrir o anuncio.');
+    } finally {
+      setLoadingListing(false);
+    }
+  }
+
+  async function handleDeleteChat() {
+    Alert.alert('Excluir conversa', 'Esta conversa sumira apenas para voce.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteChatForUser(user.uid, chatId);
+            navigate('chat');
+          } catch (error) {
+            alert(error.message || 'Nao foi possivel excluir a conversa.');
+          }
+        },
+      },
+    ]);
+  }
+
+  async function handleBlockUser() {
+    Alert.alert(
+      'Bloquear usuario',
+      `Voce nao podera mais conversar com ${otherUserName || 'este usuario'}.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Bloquear',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await blockUser(user.uid, otherUserId);
+              alert('Usuario bloqueado.');
+              navigate('chat');
+            } catch (error) {
+              alert(error.message || 'Nao foi possivel bloquear o usuario.');
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  function handleReportUser() {
+    const reasons = ['Assedio', 'Golpe/fraude', 'Spam', 'Outro'];
+
+    Alert.alert('Denunciar usuario', 'Selecione o motivo da denuncia:', [
+      ...reasons.map((reason) => ({
+        text: reason,
+        onPress: async () => {
+          try {
+            await reportUser({
+              reporterId: user.uid,
+              reportedId: otherUserId,
+              chatId,
+              reason,
+            });
+            alert('Denuncia enviada. Obrigado por nos avisar.');
+          } catch (error) {
+            alert(error.message || 'Nao foi possivel enviar a denuncia.');
+          }
+        },
+      })),
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }
+
+  async function handleViewProfile() {
+    setProfileVisible(true);
+    setProfileLoading(true);
+    setProfileData(null);
+
+    try {
+      const profile = await fetchUserProfile(otherUserId);
+      setProfileData(profile);
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel carregar o perfil.');
+      setProfileVisible(false);
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  async function handlePickImage() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      alert('Permita acesso a galeria para enviar uma imagem.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !chatId || !chat || !user) {
+      return;
+    }
+
+    setSendingAttachment(true);
+
+    try {
+      await clearTyping(chatId, user.uid);
+      await sendImageMessage(chatId, chat, user, result.assets[0].uri);
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel enviar a imagem.');
+    } finally {
+      setSendingAttachment(false);
+    }
+  }
+
+  function handleAttachmentPress() {
+    Alert.alert('Anexar', 'Escolha uma opcao:', [
+      { text: 'Enviar imagem da galeria', onPress: handlePickImage },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }
+
+  const menuActions = [
+    { label: 'Ver anuncio', onPress: handleVerAnuncio },
+    { label: 'Ver perfil', onPress: handleViewProfile },
+    { label: 'Denunciar usuario', onPress: handleReportUser },
+    { label: 'Bloquear usuario', onPress: handleBlockUser, destructive: true },
+    { label: 'Excluir conversa', onPress: handleDeleteChat, destructive: true },
+  ];
 
   return (
     <SafeAreaView style={styles.chatScreen}>
@@ -137,14 +358,14 @@ export function ChatConversationScreen({ navigate, routeParams }) {
           <UserAvatar initials={otherUserInitials} color="#bf7a4e" size={avatarSize} online />
           <View style={styles.chatIdentity}>
             <Text style={[styles.chatName, { fontSize: 15 }]} numberOfLines={1}>
-              {otherUserName || 'Usuário'}
+              {otherUserName || 'Usuario'}
             </Text>
             <Text style={[styles.chatRole, { fontSize: 10, lineHeight: roleSize }]} numberOfLines={2}>
-              Conversa sobre anúncio
+              Conversa sobre anuncio
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.headerIcon}>
+          <TouchableOpacity style={styles.headerIcon} onPress={() => setMenuVisible(true)}>
             <Entypo name="dots-three-vertical" size={isCompact ? 20 : 23} color={colors.brownDark} />
           </TouchableOpacity>
         </View>
@@ -155,63 +376,94 @@ export function ChatConversationScreen({ navigate, routeParams }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-        <View style={[styles.chatListing, isCompact && styles.chatListingCompact]}>
-          <View style={styles.chatThumb}>
-            <Text style={styles.chatThumbText}>1ª ED.</Text>
+          <View style={[styles.chatListing, isCompact && styles.chatListingCompact]}>
+            {chat?.listingImage ? (
+              <Image source={{ uri: chat.listingImage }} style={styles.chatListingImage} />
+            ) : (
+              <View style={styles.chatListingFallback}>
+                <Feather name="book-open" size={24} color={colors.brown} />
+              </View>
+            )}
+            <View style={[styles.chatListingText, { minWidth: 0 }]}>
+              <Text style={styles.chatListingTitle}>{chat?.listingTitle}</Text>
+              <Text style={styles.chatListingMeta}>Anuncio vinculado</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.adButton, isCompact && styles.adButtonCompact]}
+              onPress={handleVerAnuncio}
+              disabled={loadingListing}
+            >
+              <Text style={[styles.adButtonText, isCompact && { fontSize: 15 }]}>
+                {loadingListing ? 'Carregando...' : 'Ver Anuncio'}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <View style={[styles.chatListingText, { minWidth: 0 }]}>
-            <Text style={styles.chatListingTitle}>{chat?.listingTitle}</Text>
-            <Text style={styles.chatListingMeta}>
-              {chat?.lastMessage || 'Conversa iniciada'}
-            </Text>
-          </View>
-          <TouchableOpacity style={[styles.adButton, isCompact && styles.adButtonCompact]} onPress={() => navigate('details')}>
-            <Text style={[styles.adButtonText, isCompact && { fontSize: 15 }]}>Ver Anúncio</Text>
-          </TouchableOpacity>
-        </View>
 
-        <Text style={[styles.dateChip, isCompact && { paddingHorizontal: 12, letterSpacing: 1 }]}>
-          {currentDateLabel}
-        </Text>
+          <Text style={[styles.dateChip, isCompact && { paddingHorizontal: 12, letterSpacing: 1 }]}>
+            {currentDateLabel}
+          </Text>
 
-        {messages.map((message) => (
-          <ChatMessageBubble
-            key={message.id}
-            incoming={message.senderId !== user?.uid}
-          >
-            {message.text}
-          </ChatMessageBubble>
-        ))}
+          {messages.map((message) => (
+            <ChatMessageBubble
+              key={message.id}
+              incoming={message.senderId !== user?.uid}
+              type={message.type}
+              imageUrl={message.imageUrl}
+            >
+              {message.text}
+            </ChatMessageBubble>
+          ))}
         </ScrollView>
 
-        <View style={[styles.typingLine, { paddingHorizontal: contentPad }]}>
-          <View style={styles.typingDots}>
-            <View style={styles.dot} />
-            <View style={styles.dot} />
-            <View style={styles.dot} />
+        {otherUserTyping ? (
+          <View style={[styles.typingLine, { paddingHorizontal: contentPad }]}>
+            <View style={styles.typingDots}>
+              <View style={styles.dot} />
+              <View style={styles.dot} />
+              <View style={styles.dot} />
+            </View>
+            <Text style={styles.typingText}>{otherUserName || 'Usuario'} esta digitando...</Text>
           </View>
-          <Text style={styles.typingText}>Julian está digitando...</Text>
-        </View>
+        ) : null}
 
         <View style={[styles.messageBar, { paddingHorizontal: Math.max(12, contentPad - 4) }]}>
-          <TouchableOpacity style={[styles.addMessageButton, isCompact && styles.addMessageButtonCompact]}>
+          <TouchableOpacity
+            style={[styles.addMessageButton, isCompact && styles.addMessageButtonCompact]}
+            onPress={handleAttachmentPress}
+            disabled={sendingAttachment}
+          >
             <Feather name="plus" size={isCompact ? 15 : 20} color={colors.brown} />
           </TouchableOpacity>
-          
+
           <View style={[styles.messageInputWrap, isCompact && styles.messageInputWrapCompact]}>
-            <TextInput style={[styles.messageInput, isCompact && { fontSize: 10 }]}
-              placeholder="..." 
-              placeholderTextColor="#b8aea9" 
+            <TextInput
+              style={[styles.messageInput, isCompact && { fontSize: 10 }]}
+              placeholder="..."
+              placeholderTextColor="#b8aea9"
               value={messageText}
-              onChangeText={setMessageText}
+              onChangeText={handleMessageChange}
+              editable={!sendingAttachment}
             />
           </View>
 
-          <TouchableOpacity style={[styles.sendButton, isCompact && styles.sendButtonCompact]} onPress={enviarMensagem}>
+          <TouchableOpacity
+            style={[styles.sendButton, isCompact && styles.sendButtonCompact]}
+            onPress={enviarMensagem}
+            disabled={sendingAttachment}
+          >
             <Ionicons name="send" size={isCompact ? 15 : 20} color={colors.white} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <ChatActionsMenu visible={menuVisible} onClose={() => setMenuVisible(false)} actions={menuActions} />
+      <ChatUserProfileModal
+        visible={profileVisible}
+        onClose={() => setProfileVisible(false)}
+        profile={profileData}
+        loading={profileLoading}
+        displayName={otherUserName}
+      />
     </SafeAreaView>
   );
 }
@@ -270,33 +522,39 @@ const styles = StyleSheet.create({
   chatListingCompact: {
     padding: 16,
   },
-  chatThumb: {
-    display: 'none',
-    width: 100,
-    height: 30,
-    borderRadius: 4,
-    backgroundColor: '#6b3b24',
+  chatListingImage: {
+    width: 72,
+    height: 96,
+    borderRadius: 6,
+    backgroundColor: colors.paperStrong,
+  },
+  chatListingFallback: {
+    width: 72,
+    height: 96,
+    borderRadius: 6,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  chatThumbText: {
-    color: '#e7c291',
-    fontSize: 13,
-    fontWeight: '900',
+    borderWidth: 1,
+    borderColor: colors.line,
   },
   chatListingText: {
     flex: 1,
     minWidth: 100,
+    alignItems: 'center',
   },
   chatListingTitle: {
     color: colors.brownDark,
     fontSize: 16,
     lineHeight: 22,
+    textAlign: 'center',
+    fontWeight: '800',
   },
   chatListingMeta: {
     color: '#5f5751',
-    fontSize: 16,
+    fontSize: 14,
     lineHeight: 22,
+    textAlign: 'center',
   },
   adButton: {
     borderRadius: 30,
@@ -330,11 +588,11 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   typingLine: {
-    display: 'none',
     height: 24,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    marginBottom: 6,
   },
   typingDots: {
     flexDirection: 'row',
