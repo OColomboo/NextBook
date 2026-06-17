@@ -1,101 +1,156 @@
-import React, { useEffect, useState} from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../theme/appColors';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { CommunityPostCard } from '../components/community/CommunityPostCard';
+import { ReviewCommentsModal } from '../components/community/ReviewCommentsModal';
+import { ChatActionsMenu } from '../components/chat/ChatActionsMenu';
+import {
+  deleteReview,
+  getCommentsCount,
+  toggleLike,
+} from '../components/community/ReviewService';
 import firebase from '../firebaseConfig';
-import { getDatabase, ref, get, set, remove, onValue} from 'firebase/database';
+import { getDatabase, onValue, ref } from 'firebase/database';
 import { getAuth } from 'firebase/auth';
 
-
 export function CommunityFeedScreen({ navigate, openMenu }) {
-  const [review,setReviews] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [commentsModalReview, setCommentsModalReview] = useState(null);
+  const [menuReview, setMenuReview] = useState(null);
 
   const db = getDatabase(firebase);
   const auth = getAuth(firebase);
-  
-  async function toggleLike(reviewId) {
-    const user = auth.currentUser;
+  const user = auth.currentUser;
 
-    if (!user) {
-      alert('Você precisa estar logado para curtir!');
-      return;
-    }
-    const likeRef = ref(db, `reviews/${reviewId}/likesByUser/${user.uid}`);
-    const snapshot = await get(likeRef);
-
-    if(snapshot.exists()){
-      await remove(likeRef);
-    } else{
-      await set(likeRef, true);
-    }
-  }
   useEffect(() => {
     const reviewRef = ref(db, 'reviews');
     const unsubscribe = onValue(reviewRef, (snapshot) => {
       const data = snapshot.val();
 
-      if(!data){
+      if (!data) {
         setReviews([]);
         return;
       }
 
       const reviewsArray = Object.entries(data)
-        .map(([id, review]) => ({
+        .map(([id, item]) => ({
           id,
-          ...review,
+          ...item,
         }))
         .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
+
       setReviews(reviewsArray);
     });
-    return()=> unsubscribe();
-  }, []);
-  
+
+    return () => unsubscribe();
+  }, [db]);
+
+  async function handleToggleLike(reviewId) {
+    if (!user) {
+      alert('Voce precisa estar logado para curtir!');
+      return;
+    }
+
+    try {
+      await toggleLike(reviewId, user.uid);
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel curtir a avaliacao.');
+    }
+  }
+
+  function handleDeleteReview(review) {
+    Alert.alert('Excluir avaliacao', 'Deseja remover esta avaliacao da comunidade?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteReview(review.id, user.uid);
+          } catch (error) {
+            alert(error.message || 'Nao foi possivel excluir a avaliacao.');
+          }
+        },
+      },
+    ]);
+  }
+
+  const menuActions = menuReview
+    ? [
+        {
+          label: 'Editar avaliacao',
+          onPress: () => navigate('review', { reviewId: menuReview.id }),
+        },
+        {
+          label: 'Excluir avaliacao',
+          destructive: true,
+          onPress: () => handleDeleteReview(menuReview),
+        },
+      ]
+    : [];
+
   return (
     <MainScreenScaffold active="community" navigate={navigate} openMenu={openMenu}>
       <Text style={styles.pageTitle}>Comunidade</Text>
-      <Text style={styles.pageSubtitle}>Explore as opiniôes literárias dos usuários do NextBook.</Text>
+      <Text style={styles.pageSubtitle}>Explore as opinioes literarias dos usuarios do NextBook.</Text>
 
       <View style={styles.composerCard}>
         <View style={styles.composerContent}>
-          <Text style={styles.pageBig}>Compartilhe com a comunidade o que você está lendo!</Text>
+          <Text style={styles.pageBig}>Compartilhe com a comunidade o que voce esta lendo!</Text>
           <View style={styles.composerFooter}>
-            <Text style={styles.pageText}>Escreva o que está achando</Text>
-            
+            <Text style={styles.pageText}>Escreva o que esta achando</Text>
+
             <TouchableOpacity style={styles.smallBrownButton} onPress={() => navigate('review')}>
-              <Text style={styles.smallBrownButtonText}>
-              Escrever
-              </Text>
+              <Text style={styles.smallBrownButtonText}>Escrever</Text>
             </TouchableOpacity>
-          
           </View>
         </View>
       </View>
 
-      {review.map((review)=> {
-      
-      const user = auth.currentUser;
-      const likesByUser = review.likesByUser || {};
-      const liked = !!likesByUser[user?.uid];
-      const likesCount = Object.keys(likesByUser).length;
-      
-      return (
-        <CommunityPostCard
-          key={review.id}
-          avatar={review.userName?.slice(0, 2).toUpperCase() || 'US'}
-          name={review.userName}
-          meta="AVALIAÇÃO"
-          bookname={review.bookname}
-          rating={review.rating}
-          text={review.text}
-          imageSource={review.imageSource}
-          likes={String(likesCount)}
-          liked={liked}
-          onLikePress={() => toggleLike(review.id)}
-          comments={String(review.comments || 0)}
-        />
+      {reviews.map((item) => {
+        const likesByUser = item.likesByUser || {};
+        const liked = !!likesByUser[user?.uid];
+        const likesCount = Object.keys(likesByUser).length;
+        const commentsCount = getCommentsCount(item);
+        const isOwner = user?.uid === item.userId;
+
+        return (
+          <CommunityPostCard
+            key={item.id}
+            avatar={item.userName?.slice(0, 2).toUpperCase() || 'US'}
+            name={item.userName}
+            meta="AVALIACAO"
+            bookname={item.bookname}
+            publisher={item.publisher}
+            rating={item.rating}
+            text={item.text}
+            imageSource={item.imageSource}
+            likes={String(likesCount)}
+            liked={liked}
+            onLikePress={() => handleToggleLike(item.id)}
+            comments={String(commentsCount)}
+            onCommentPress={() => setCommentsModalReview({ id: item.id, bookname: item.bookname })}
+            isOwner={isOwner}
+            onMenuPress={() => setMenuReview(item)}
+          />
         );
       })}
+
+      <ReviewCommentsModal
+        visible={Boolean(commentsModalReview)}
+        onClose={() => setCommentsModalReview(null)}
+        reviewId={commentsModalReview?.id}
+        reviewTitle={commentsModalReview?.bookname}
+        currentUser={user}
+      />
+
+      <ChatActionsMenu
+        visible={Boolean(menuReview)}
+        onClose={() => setMenuReview(null)}
+        title="Opcoes da avaliacao"
+        actions={menuActions}
+      />
     </MainScreenScaffold>
   );
 }
@@ -107,12 +162,12 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     marginTop: 28,
   },
-  pageText:{
+  pageText: {
     color: colors.ink,
     fontSize: 17,
-    marginRight: 10
+    marginRight: 10,
   },
-  pageBig:{
+  pageBig: {
     color: colors.ink,
     fontSize: 23,
   },

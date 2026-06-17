@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import { Entypo, Feather, FontAwesome } from '@expo/vector-icons';
 import { colors } from '../../theme/appColors';
 import { UserAvatar } from './UserAvatar';
 
@@ -9,6 +9,7 @@ export function CommunityPostCard({
   name,
   meta,
   bookname,
+  publisher,
   rating,
   text,
   imageSource,
@@ -16,6 +17,9 @@ export function CommunityPostCard({
   liked,
   onLikePress,
   comments,
+  onCommentPress,
+  isOwner,
+  onMenuPress,
   accent,
   centered,
 }) {
@@ -27,51 +31,55 @@ export function CommunityPostCard({
           <Text style={styles.postName}>{name}</Text>
           <Text style={styles.postMeta}>{meta}</Text>
         </View>
-      </View>
-        
-        {bookname ? (
-          <View style={styles.BookRatingRow}>
-            <Text style={styles.postBookName}>{bookname}</Text>
-
-            <View style={styles.starsRow}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <FontAwesome
-                  key={star}
-                  name={star <= rating ? 'star' : 'star-o'}
-                  size={18}
-                  color={colors.brownDark}        
-                />
-              ))}
-            </View>
-          </View>
+        {isOwner ? (
+          <TouchableOpacity style={styles.menuButton} onPress={onMenuPress} activeOpacity={0.7}>
+            <Entypo name="dots-three-vertical" size={20} color={colors.brownDark} />
+          </TouchableOpacity>
         ) : null}
+      </View>
 
-        <Text style={[styles.postText, centered && styles.centeredPost]}>{text}</Text>
-      
-      {imageSource ? (
-        <Image
-          source={{ uri: imageSource}}
-          style={styles.postImage}
-          resizeMode='cover'
-        />
+      {bookname ? (
+        <View style={styles.BookRatingRow}>
+          <View style={styles.bookInfo}>
+            <Text style={styles.postBookName}>{bookname}</Text>
+            {publisher ? <Text style={styles.publisherText}>{publisher}</Text> : null}
+          </View>
+
+          <View style={styles.starsRow}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <FontAwesome
+                key={star}
+                name={star <= rating ? 'star' : 'star-o'}
+                size={18}
+                color={colors.brownDark}
+              />
+            ))}
+          </View>
+        </View>
       ) : null}
-      
+
+      <Text style={[styles.postText, centered && styles.centeredPost]}>{text}</Text>
+
+      {imageSource ? (
+        <Image source={{ uri: imageSource }} style={styles.postImage} resizeMode="cover" />
+      ) : null}
+
       <View style={styles.postFooter}>
         <View style={styles.postStats}>
           <TouchableOpacity style={styles.statPair} onPress={onLikePress} activeOpacity={0.7}>
-          <FontAwesome
-            name={liked ? 'heart' : 'heart-o'}
-            size={23}
-            color={liked ? '#e02424' : colors.muted}
-          />
-          <Text style={styles.statText}>{likes}</Text>
+            <FontAwesome
+              name={liked ? 'heart' : 'heart-o'}
+              size={23}
+              color={liked ? '#e02424' : colors.muted}
+            />
+            <Text style={styles.statText}>{likes}</Text>
           </TouchableOpacity>
-          <View style={styles.statPair}>
+          <TouchableOpacity style={styles.statPair} onPress={onCommentPress} activeOpacity={0.7}>
             <Feather name="message-square" size={24} color={colors.muted} />
             <Text style={styles.statText}>{comments}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
-          <Feather name={'bookmark'} size={23} color={colors.muted} />
+        <Feather name="bookmark" size={23} color={colors.muted} />
       </View>
     </View>
   );
@@ -96,18 +104,34 @@ const styles = StyleSheet.create({
   },
   postIdentity: {
     flex: 1,
+    minWidth: 0,
+  },
+  menuButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   postName: {
     color: colors.ink,
     fontSize: 18,
     fontWeight: '900',
   },
+  bookInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
   postBookName: {
     color: colors.ink,
     fontSize: 18,
     fontWeight: '800',
-    marginBottom: 10,
-    flexShrink: 1,
+    marginBottom: 4,
+  },
+  publisherText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginBottom: 6,
   },
   postMeta: {
     color: colors.muted,
@@ -154,7 +178,7 @@ const styles = StyleSheet.create({
   },
   BookRatingRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     marginBottom: 10,
     flexWrap: 'wrap',
@@ -163,6 +187,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
+    paddingTop: 2,
   },
   statPair: {
     flexDirection: 'row',

@@ -1,13 +1,23 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors } from '../../theme/appColors';
 
-export function GenrePillTag({ label, active, muted }) {
-  return (
+export function GenrePillTag({ label, active, muted, onPress }) {
+  const content = (
     <View style={[styles.pill, active && styles.pillActive, muted && styles.pillMuted]}>
       <Text style={[styles.pillText, active && styles.pillActiveText]}>{label}</Text>
     </View>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return content;
 }
 
 const styles = StyleSheet.create({
