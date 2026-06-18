@@ -65,31 +65,12 @@ function pickOpenLibraryIsbn(identifiers = {}, fallbackIsbn) {
   return normalizeIsbn(identifiers.isbn_13?.[0] || identifiers.isbn_10?.[0] || fallbackIsbn);
 }
 
-async function readErrorText(response) {
-  try {
-    return await response.text();
-  } catch (error) {
-    return 'Nao foi possivel ler o corpo da resposta.';
-  }
-}
-
 async function fetchBookByIsbnFromGoogle(isbn) {
   const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(`isbn:${isbn}`)}`;
   const response = await fetch(url);
 
   if (!response.ok) {
-    const errorText = await readErrorText(response);
-
-    console.log('Erro Google Books:', {
-      status: response.status,
-      url,
-      body: errorText,
-    });
-
-    const error = new Error(`Nao foi possivel consultar o Google Books. Status: ${response.status}`);
-    error.status = response.status;
-    error.source = 'Google Books';
-    throw error;
+    throw new Error(`Nao foi possivel consultar o Google Books. Status: ${response.status}`);
   }
 
   const data = await response.json();
@@ -118,18 +99,7 @@ async function fetchBookByIsbnFromOpenLibrary(isbn) {
   const response = await fetch(url);
 
   if (!response.ok) {
-    const errorText = await readErrorText(response);
-
-    console.log('Erro Open Library:', {
-      status: response.status,
-      url,
-      body: errorText,
-    });
-
-    const error = new Error(`Nao foi possivel consultar a Open Library. Status: ${response.status}`);
-    error.status = response.status;
-    error.source = 'Open Library';
-    throw error;
+    throw new Error(`Nao foi possivel consultar a Open Library. Status: ${response.status}`);
   }
 
   const data = await response.json();
@@ -162,11 +132,8 @@ export async function fetchBookByIsbn(isbnInput) {
 
   try {
     return await fetchBookByIsbnFromGoogle(isbn);
-  } catch (googleError) {
-    console.log('Google Books falhou, tentando Open Library:', {
-      status: googleError.status,
-      message: googleError.message,
-    });
+  } catch {
+    // Tenta uma segunda fonte quando o Google Books falha por limite ou indisponibilidade.
   }
 
   return await fetchBookByIsbnFromOpenLibrary(isbn);

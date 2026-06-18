@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { getAuth } from 'firebase/auth';
 import { colors } from '../theme/appColors';

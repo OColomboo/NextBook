@@ -1,4 +1,4 @@
-import React, { useEffect, useState} from 'react';
+import React, { useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
 import { Feather} from '@expo/vector-icons';
 import { colors } from '../theme/appColors';
@@ -6,7 +6,6 @@ import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import firebase from '../firebaseConfig';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import {
-  AuthCheckboxRow,
   AuthDividerLabel,
   AuthInputField,
   AuthPrimaryButton,
@@ -90,11 +89,6 @@ export function LoginScreen({ navigate }) {
           onChangeText={setSenha}
         />
 
-        {/*
-        // implementar depois
-        <AuthCheckboxRow label="Permanecer conectado por 30 dias" large />
-        */}
-
         <AuthPrimaryButton
           label= "Entrar"
           icon={<Feather name="arrow-right" size={18} color={colors.white}/>}
@@ -111,7 +105,6 @@ export function LoginScreen({ navigate }) {
 
         <View style={styles.socialRow}>
           <TouchableOpacity style={styles.socialButton}>
-            <View style={styles.googleMark} />
             <Image
               source={require("../../assets/google_logo.png")}
               style={styles.socialLogo}

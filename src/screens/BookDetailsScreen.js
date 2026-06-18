@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { getAuth } from 'firebase/auth';
 import { getDatabase, onValue, ref } from 'firebase/database';
@@ -9,7 +9,9 @@ import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { GenrePillTag } from '../components/books/GenrePillTag';
 import { BookListCard } from '../components/books/BookListCard';
+import { CommunityPostCard } from '../components/community/CommunityPostCard';
 import { toggleSavedListing } from '../components/books/ListingService';
+import { toggleSavedReview } from '../components/community/ReviewService';
 import { listingMatchesSearch } from '../utils/listingFilters';
 
 function mapFirebaseList(value) {
@@ -56,6 +58,27 @@ function getActionLabel(book) {
   return price.includes('R$') ? price : `R$ ${price}`;
 }
 
+function reviewMatchesSearch(review, searchTerm) {
+  if (!searchTerm.trim()) {
+    return true;
+  }
+
+  const query = searchTerm.trim().toLowerCase();
+  const searchableText = [
+    review?.bookname,
+    review?.author,
+    review?.publisher,
+    review?.genre,
+    review?.text,
+    review?.userName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return searchableText.includes(query);
+}
+
 function EmptySection({ text }) {
   return (
     <View style={styles.emptyCard}>
@@ -75,8 +98,6 @@ function ListingSection({
   onOpenBook,
   onSavePress,
   saved = false,
-  showEditAction = false,
-  onEditBook,
 }) {
   return (
     <View style={styles.sectionBlock}>
@@ -91,31 +112,74 @@ function ListingSection({
       <Text style={styles.sectionHint}>{hint}</Text>
 
       {items.length > 0 ? (
-        items.map((book) => (
-          <View key={book.id}>
-            <BookListCard
-              title={book.title || 'Livro sem titulo'}
-              author={book.author || 'Autor nao informado'}
-              description={book.description || book.synopsis || 'Sem descricao informada.'}
-              badge={book.condition?.toUpperCase() || 'ANUNCIO'}
-              action={getActionLabel(book)}
-              color={colors.greenDark}
-              avatar={getInitials(book.userName)}
-              name={book.userName || 'Usuario'}
-              imageSource={book.imageSource}
-              onPress={onOpenBook ? () => onOpenBook(book) : undefined}
-              saved={saved}
-              onSavePress={onSavePress ? () => onSavePress(book) : undefined}
-            />
-            {showEditAction && onEditBook ? (
-              <TouchableOpacity style={styles.editLink} onPress={() => onEditBook(book)}>
-                <Text style={styles.sectionLink}>Editar anuncio</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        ))
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.horizontalCards}
+        >
+          {items.map((book) => (
+            <View key={book.id} style={styles.horizontalCardShell}>
+              <BookListCard
+                title={book.title || 'Livro sem titulo'}
+                author={book.author || 'Autor nao informado'}
+                description={book.description || book.synopsis || 'Sem descricao informada.'}
+                badge={book.condition?.toUpperCase() || 'ANUNCIO'}
+                action={getActionLabel(book)}
+                color={colors.greenDark}
+                avatar={getInitials(book.userName)}
+                name={book.userName || 'Usuario'}
+                imageSource={book.imageSource}
+                onPress={onOpenBook ? () => onOpenBook(book) : undefined}
+                saved={saved}
+                onSavePress={onSavePress ? () => onSavePress(book) : undefined}
+                style={styles.horizontalBookCard}
+              />
+            </View>
+          ))}
+        </ScrollView>
       ) : (
         <EmptySection text={emptyText} />
+      )}
+    </View>
+  );
+}
+
+function SavedReviewsSection({ items, onUnsave }) {
+  return (
+    <View style={styles.sectionBlock}>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionEyebrow}>REVIEWS SALVAS</Text>
+      </View>
+      <Text style={styles.sectionHint}>Avaliacoes da comunidade que voce salvou para ler depois.</Text>
+
+      {items.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.horizontalCards}
+        >
+          {items.map((review) => (
+            <CommunityPostCard
+              key={review.id}
+              avatar={review.userName?.slice(0, 2).toUpperCase() || 'US'}
+              name={review.userName || 'Usuario'}
+              meta="AVALIACAO SALVA"
+              bookname={review.bookname}
+              publisher={review.publisher}
+              rating={review.rating}
+              text={review.text}
+              imageSource={review.imageSource}
+              likes="0"
+              liked={false}
+              comments="0"
+              saved
+              onSavePress={() => onUnsave(review)}
+              style={styles.horizontalReviewCard}
+            />
+          ))}
+        </ScrollView>
+      ) : (
+        <EmptySection text="Voce ainda nao salvou nenhuma review." />
       )}
     </View>
   );
@@ -127,6 +191,7 @@ export function BookDetailsScreen({ navigate, openMenu }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [myListings, setMyListings] = useState([]);
   const [savedListings, setSavedListings] = useState([]);
+  const [savedReviews, setSavedReviews] = useState([]);
   const [negotiatedListings, setNegotiatedListings] = useState([]);
   const titleSize = isCompact ? 26 : 31;
 
@@ -177,18 +242,33 @@ export function BookDetailsScreen({ navigate, openMenu }) {
     return unsubscribe;
   }, [user?.uid]);
 
+  useEffect(() => {
+    if (!user?.uid) {
+      setSavedReviews([]);
+      return undefined;
+    }
+
+    const savedReviewsRef = ref(db, `savedReviews/${user.uid}`);
+    const unsubscribe = onValue(savedReviewsRef, (snapshot) => {
+      setSavedReviews(mapFirebaseList(snapshot.val()));
+    });
+
+    return unsubscribe;
+  }, [user?.uid]);
+
   const saleListings = useMemo(() => myListings.filter(isSaleListing), [myListings]);
   const tradeListings = useMemo(() => myListings.filter(isTradeListing), [myListings]);
 
   const filteredSaleListings = saleListings.filter((book) => listingMatchesSearch(book, searchTerm));
   const filteredTradeListings = tradeListings.filter((book) => listingMatchesSearch(book, searchTerm));
   const filteredSavedListings = savedListings.filter((book) => listingMatchesSearch(book, searchTerm));
+  const filteredSavedReviews = savedReviews.filter((review) => reviewMatchesSearch(review, searchTerm));
   const filteredNegotiatedListings = negotiatedListings.filter((book) => listingMatchesSearch(book, searchTerm));
 
   const stats = [
     { key: 'venda', label: 'A VENDA', value: saleListings.length },
     { key: 'troca', label: 'PARA TROCA', value: tradeListings.length },
-    { key: 'salvos', label: 'SALVOS', value: savedListings.length },
+    { key: 'salvos', label: 'SALVOS', value: savedListings.length + savedReviews.length },
     { key: 'negociados', label: 'NEGOCIADOS', value: negotiatedListings.length },
   ];
 
@@ -208,8 +288,16 @@ export function BookDetailsScreen({ navigate, openMenu }) {
     }
   }
 
-  function handleEditListing(book) {
-    navigate('add', { listingId: book.id });
+  async function handleUnsaveReview(review) {
+    if (!user?.uid || !review?.id) {
+      return;
+    }
+
+    try {
+      await toggleSavedReview(user.uid, review, true);
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel remover a review salva.');
+    }
   }
 
   return (
@@ -266,8 +354,6 @@ export function BookDetailsScreen({ navigate, openMenu }) {
           actionLabel="+ Anunciar"
           onAction={() => navigate('add')}
           onOpenBook={openBook}
-          showEditAction
-          onEditBook={handleEditListing}
         />
       )}
 
@@ -280,21 +366,23 @@ export function BookDetailsScreen({ navigate, openMenu }) {
           actionLabel="+ Anunciar"
           onAction={() => navigate('add')}
           onOpenBook={openBook}
-          showEditAction
-          onEditBook={handleEditListing}
         />
       )}
 
       {(filter === 'todos' || filter === 'salvos') && (
-        <ListingSection
-          title="SALVOS"
-          hint="Anuncios que voce salvou para ver depois."
-          items={filteredSavedListings}
-          emptyText="Voce ainda nao salvou nenhum anuncio."
-          onOpenBook={openBook}
-          saved
-          onSavePress={handleUnsave}
-        />
+        <>
+          <ListingSection
+            title="ANUNCIOS SALVOS"
+            hint="Anuncios que voce salvou para ver depois."
+            items={filteredSavedListings}
+            emptyText="Voce ainda nao salvou nenhum anuncio."
+            onOpenBook={openBook}
+            saved
+            onSavePress={handleUnsave}
+          />
+
+          <SavedReviewsSection items={filteredSavedReviews} onUnsave={handleUnsaveReview} />
+        </>
       )}
 
       {(filter === 'todos' || filter === 'negociados') && (
@@ -343,8 +431,8 @@ const styles = StyleSheet.create({
   },
   statCell: {
     flexGrow: 1,
-    flexBasis: '22%',
-    minWidth: 72,
+    flexBasis: '21%',
+    minWidth: 68,
     backgroundColor: colors.surfaceWarm,
     borderRadius: 8,
     borderWidth: 1,
@@ -415,9 +503,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  editLink: {
-    alignSelf: 'flex-end',
-    marginTop: -18,
-    marginBottom: 18,
+  horizontalCards: {
+    gap: 14,
+    paddingRight: 8,
+  },
+  horizontalCardShell: {
+    width: 286,
+  },
+  horizontalBookCard: {
+    width: '100%',
+    marginBottom: 10,
+  },
+  horizontalReviewCard: {
+    width: 286,
+    marginBottom: 8,
   },
 });

@@ -9,6 +9,7 @@ import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
 import {
   deleteReview,
   getCommentsCount,
+  toggleSavedReview,
   toggleLike,
 } from '../components/community/ReviewService';
 import firebase from '../firebaseConfig';
@@ -18,6 +19,7 @@ import { getAuth } from 'firebase/auth';
 export function CommunityFeedScreen({ navigate, openMenu }) {
   const { bottomTabBarHeight } = useResponsiveLayout();
   const [reviews, setReviews] = useState([]);
+  const [savedReviewIds, setSavedReviewIds] = useState({});
   const [commentsModalReview, setCommentsModalReview] = useState(null);
   const [menuReview, setMenuReview] = useState(null);
 
@@ -48,6 +50,26 @@ export function CommunityFeedScreen({ navigate, openMenu }) {
     return () => unsubscribe();
   }, [db]);
 
+  useEffect(() => {
+    if (!user?.uid) {
+      setSavedReviewIds({});
+      return undefined;
+    }
+
+    const savedRef = ref(db, `savedReviews/${user.uid}`);
+    const unsubscribe = onValue(savedRef, (snapshot) => {
+      const savedReviews = snapshot.val() || {};
+      const savedIds = Object.keys(savedReviews).reduce((acc, id) => {
+        acc[id] = true;
+        return acc;
+      }, {});
+
+      setSavedReviewIds(savedIds);
+    });
+
+    return () => unsubscribe();
+  }, [db, user?.uid]);
+
   async function handleToggleLike(reviewId) {
     if (!user) {
       alert('Voce precisa estar logado para curtir!');
@@ -58,6 +80,37 @@ export function CommunityFeedScreen({ navigate, openMenu }) {
       await toggleLike(reviewId, user.uid);
     } catch (error) {
       alert(error.message || 'Nao foi possivel curtir a avaliacao.');
+    }
+  }
+
+  async function handleToggleSaveReview(review) {
+    try {
+      if (!user) {
+        alert('Voce precisa estar logado para salvar avaliacoes.');
+        return;
+      }
+
+      if (!review?.id) {
+        alert('Nao foi possivel encontrar a avaliacao.');
+        return;
+      }
+
+      const isSaved = Boolean(savedReviewIds[review.id]);
+      await toggleSavedReview(user.uid, review, isSaved);
+
+      setSavedReviewIds((current) => {
+        const next = { ...current };
+
+        if (isSaved) {
+          delete next[review.id];
+        } else {
+          next[review.id] = true;
+        }
+
+        return next;
+      });
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel atualizar os salvos.');
     }
   }
 
@@ -156,6 +209,8 @@ export function CommunityFeedScreen({ navigate, openMenu }) {
             onLikePress={() => handleToggleLike(item.id)}
             comments={String(commentsCount)}
             onCommentPress={() => setCommentsModalReview({ id: item.id, bookname: item.bookname })}
+            saved={Boolean(savedReviewIds[item.id])}
+            onSavePress={() => handleToggleSaveReview(item)}
             isOwner={isOwner}
             onMenuPress={() => setMenuReview(item)}
           />

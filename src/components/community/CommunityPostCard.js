@@ -18,13 +18,20 @@ export function CommunityPostCard({
   onLikePress,
   comments,
   onCommentPress,
+  saved = false,
+  onSavePress,
   isOwner,
   onMenuPress,
   accent,
   centered,
+  style,
 }) {
+  function handleSavePress() {
+    onSavePress?.();
+  }
+
   return (
-    <View style={[styles.postCard, accent && styles.postAccent]}>
+    <View style={[styles.postCard, accent && styles.postAccent, style]}>
       <View style={styles.postHeader}>
         <UserAvatar initials={avatar} color={avatar === 'BO' ? '#944d2e' : avatar === 'RS' ? '#77a568' : '#a06a52'} />
         <View style={styles.postIdentity}>
@@ -79,7 +86,19 @@ export function CommunityPostCard({
             <Text style={styles.statText}>{comments}</Text>
           </TouchableOpacity>
         </View>
-        <Feather name="bookmark" size={23} color={colors.muted} />
+        <TouchableOpacity
+          style={styles.bookmarkButton}
+          onPress={handleSavePress}
+          disabled={!onSavePress}
+          activeOpacity={0.75}
+          hitSlop={10}
+        >
+          <FontAwesome
+            name={saved ? 'bookmark' : 'bookmark-o'}
+            size={23}
+            color={saved ? '#d8a21f' : colors.muted}
+          />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -198,5 +217,11 @@ const styles = StyleSheet.create({
   statText: {
     color: '#756b65',
     fontWeight: '800',
+  },
+  bookmarkButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

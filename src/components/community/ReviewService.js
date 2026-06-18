@@ -125,6 +125,42 @@ export async function toggleLike(reviewId, userId) {
   }
 }
 
+export async function saveReview(userId, review) {
+  if (!review?.id) {
+    throw new Error('Nao foi possivel encontrar a avaliacao.');
+  }
+
+  const db = getDatabase(firebase);
+
+  await set(ref(db, `savedReviews/${userId}/${review.id}`), {
+    reviewId: review.id,
+    userId: review.userId || '',
+    userName: review.userName || '',
+    bookname: review.bookname || '',
+    author: review.author || '',
+    publisher: review.publisher || '',
+    genre: review.genre || '',
+    text: review.text || '',
+    rating: review.rating || 0,
+    imageSource: review.imageSource || '',
+    criadoEm: review.criadoEm || '',
+    savedAt: serverTimestamp(),
+  });
+}
+
+export async function unsaveReview(userId, reviewId) {
+  const db = getDatabase(firebase);
+  await remove(ref(db, `savedReviews/${userId}/${reviewId}`));
+}
+
+export async function toggleSavedReview(userId, review, isSaved) {
+  if (isSaved) {
+    await unsaveReview(userId, review.id);
+  } else {
+    await saveReview(userId, review);
+  }
+}
+
 export async function addComment(reviewId, user, text) {
   const db = getDatabase(firebase);
   const userSnapshot = await get(ref(db, `usuarios/${user.uid}`));

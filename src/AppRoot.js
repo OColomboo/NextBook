@@ -14,7 +14,6 @@ import { BookDetailsScreen } from './screens/BookDetailsScreen';
 import { BookListingDetailScreen } from './screens/BookListingDetailScreen';
 import { ChatListScreen } from './screens/ChatListScreen';
 import { ChatConversationScreen } from './screens/ChatConversationScreen';
-import firebase from './firebaseConfig';
 
 function AppContent() {
   const [screen, setScreen] = useState('login');

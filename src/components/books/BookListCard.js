@@ -17,6 +17,7 @@ export function BookListCard({
   onPress,
   saved = false,
   onSavePress,
+  style,
 }) {
   function handleSavePress(event) {
     event?.stopPropagation?.();
@@ -24,7 +25,7 @@ export function BookListCard({
   }
 
   return (
-    <TouchableOpacity style={styles.listBookCard} activeOpacity={0.85} onPress={onPress}>
+    <TouchableOpacity style={[styles.listBookCard, style]} activeOpacity={0.85} onPress={onPress}>
       <View style={styles.publisherRow}>
         <UserAvatar initials={avatar || 'US'} color={colors.brown} size={38} />
         <View>

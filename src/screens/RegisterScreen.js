@@ -68,7 +68,6 @@ export function RegisterScreen({ navigate }) {
           alert('Senha fraca! A senha deve ter 6 caracteres entre letras e números.');
           return;
         }
-        console.log(error.code, error.message);
         alert(error.code || String(error));
       }
   }
