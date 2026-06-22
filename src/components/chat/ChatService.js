@@ -11,7 +11,7 @@ import {
   set,
   update,
 } from 'firebase/database';
-import { getDownloadURL, getStorage, ref as storageRef, uploadBytes } from 'firebase/storage';
+import { uploadImageUri } from '../../services/MediaUploadService';
 
 async function isUserBlocked(uidA, uidB) {
   const db = getDatabase(firebase);
@@ -23,35 +23,52 @@ async function isUserBlocked(uidA, uidB) {
   return aBlocksB.exists() || bBlocksA.exists();
 }
 
-async function updateChatPreview(db, chatId, chat, senderId, previewText) {
-  await update(ref(db, `chats/${chatId}`), {
+function getChatParticipants(chat) {
+  return [chat.sellerId, chat.buyerId].filter(Boolean);
+}
+
+function buildListingMetadata(book) {
+  return {
+    listingTitle: book.title || 'Anuncio sem titulo',
+    listingImage: book.imageSource || '',
+    listingPrice: book.price || '',
+    listingDealType: book.dealType || '',
+    listingStatus: book.status || '',
+  };
+}
+
+function buildUserChatEntry(chat, participantId, senderId, previewText) {
+  return {
+    otherUserName: participantId === chat.sellerId ? chat.buyerName : chat.sellerName,
+    listingTitle: chat.listingTitle,
+    listingImage: chat.listingImage,
+    listingPrice: chat.listingPrice || '',
+    listingDealType: chat.listingDealType || '',
+    listingStatus: chat.listingStatus || '',
     lastMessage: previewText,
     lastSenderId: senderId,
+    unread: senderId !== participantId,
     updatedAt: serverTimestamp(),
-  });
+  };
+}
 
-  for (const participantId of [chat.sellerId, chat.buyerId]) {
-    const entryRef = ref(db, `userChats/${participantId}/${chatId}`);
-    const snapshot = await get(entryRef);
-    const patch = {
-      otherUserName: participantId === chat.sellerId ? chat.buyerName : chat.sellerName,
-      listingTitle: chat.listingTitle,
-      listingImage: chat.listingImage,
-      listingPrice: chat.listingPrice || '',
-      listingDealType: chat.listingDealType || '',
-      listingStatus: chat.listingStatus || '',
-      lastMessage: previewText,
-      lastSenderId: senderId,
-      unread: senderId !== participantId,
-      updatedAt: serverTimestamp(),
-    };
+async function updateChatPreview(db, chatId, chat, senderId, previewText) {
+  const updates = {
+    [`chats/${chatId}/lastMessage`]: previewText,
+    [`chats/${chatId}/lastSenderId`]: senderId,
+    [`chats/${chatId}/updatedAt`]: serverTimestamp(),
+  };
 
-    if (snapshot.exists()) {
-      await update(entryRef, patch);
-    } else {
-      await set(entryRef, patch);
-    }
+  for (const participantId of getChatParticipants(chat)) {
+    updates[`userChats/${participantId}/${chatId}`] = buildUserChatEntry(
+      chat,
+      participantId,
+      senderId,
+      previewText,
+    );
   }
+
+  await update(ref(db), updates);
 }
 
 export async function fetchListingForChat(listingId, sellerId) {
@@ -119,15 +136,8 @@ export async function sendTextMessage(chatId, chat, user, text) {
 }
 
 export async function sendImageMessage(chatId, chat, user, localUri) {
-  const storage = getStorage(firebase);
   const db = getDatabase(firebase);
-
-  const response = await fetch(localUri);
-  const blob = await response.blob();
-  const fileRef = storageRef(storage, `chat-attachments/${chatId}/${user.uid}/${Date.now()}.jpg`);
-
-  await uploadBytes(fileRef, blob);
-  const imageUrl = await getDownloadURL(fileRef);
+  const imageUrl = await uploadImageUri(localUri, `chat-attachments/${chatId}/${user.uid}/${Date.now()}.jpg`);
 
   const messageRef = push(ref(db, `chats/${chatId}/messages`));
 
@@ -192,20 +202,12 @@ export async function abrirChat(book) {
 
     const buyerName = userData?.nome || user.displayName || 'Usuario';
     const sellerName = book.userName || 'Usuario';
-    const listingTitle = book.title || 'Anuncio sem titulo';
-    const listingImage = book.imageSource || '';
-    const listingPrice = book.price || '';
-    const listingDealType = book.dealType || '';
-    const listingStatus = book.status || '';
-    const initialMessage = `Ola! Tenho interesse no anuncio "${listingTitle}".`;
+    const listingMetadata = buildListingMetadata(book);
+    const initialMessage = `Ola! Tenho interesse no anuncio "${listingMetadata.listingTitle}".`;
 
     await set(chatRef, {
       listingId: book.id,
-      listingTitle,
-      listingImage,
-      listingPrice,
-      listingDealType,
-      listingStatus,
+      ...listingMetadata,
       sellerId: book.userId,
       sellerName,
       buyerId: user.uid,
@@ -229,11 +231,7 @@ export async function abrirChat(book) {
 
     await set(ref(db, `userChats/${user.uid}/${chatId}`), {
       otherUserName: sellerName,
-      listingTitle,
-      listingImage,
-      listingPrice,
-      listingDealType,
-      listingStatus,
+      ...listingMetadata,
       lastMessage: initialMessage,
       lastSenderId: user.uid,
       unread: false,
@@ -242,11 +240,7 @@ export async function abrirChat(book) {
 
     await set(ref(db, `userChats/${book.userId}/${chatId}`), {
       otherUserName: buyerName,
-      listingTitle,
-      listingImage,
-      listingPrice,
-      listingDealType,
-      listingStatus,
+      ...listingMetadata,
       lastMessage: initialMessage,
       lastSenderId: user.uid,
       unread: true,

@@ -63,3 +63,7 @@ export async function shareListing(book) {
     title: book.title,
   });
 }
+
+export function getListingNegotiatedStatus(book) {
+  return String(book?.dealType || '').toLowerCase() === 'troca' ? 'trocado' : 'vendido';
+}

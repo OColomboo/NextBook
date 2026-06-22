@@ -7,6 +7,7 @@ import { getDatabase, onValue, ref } from 'firebase/database';
 import { colors } from '../theme/appColors';
 import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { UserAvatar } from '../components/community/UserAvatar';
+import { snapshotToArray, sortByNewest } from '../utils/firebaseSnapshots';
 
 function formatChatDate(value) {
   if (!value) {
@@ -54,21 +55,7 @@ export function ChatListScreen({ navigate, openMenu }) {
     const userChatsRef = ref(db, `userChats/${user.uid}`);
 
     const unsubscribe = onValue(userChatsRef, (snapshot) => {
-      const data = snapshot.val();
-
-      if (!data) {
-        setChats([]);
-        return;
-      }
-
-      const chatsArray = Object.entries(data)
-        .map(([id, chat]) => ({
-          id,
-          ...chat,
-        }))
-        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-
-      setChats(chatsArray);
+      setChats(snapshotToArray(snapshot).sort(sortByNewest('updatedAt')));
     });
 
     return () => unsubscribe();

@@ -116,3 +116,24 @@ export async function toggleSavedListing(userId, book, isSaved) {
     await saveListing(userId, book);
   }
 }
+
+export async function markListingAsNegotiated(userId, book, status) {
+  if (!book?.id) {
+    throw new Error('Nao foi possivel encontrar o codigo do anuncio.');
+  }
+
+  if (book.userId !== userId) {
+    throw new Error('Apenas o dono do anuncio pode marcar como negociado.');
+  }
+
+  const db = getDatabase(firebase);
+
+  await update(ref(db), {
+    [`negotiatedListings/${userId}/${book.id}`]: {
+      ...book,
+      status,
+      negotiatedAt: serverTimestamp(),
+    },
+    [`bookListings/${book.id}`]: null,
+  });
+}

@@ -6,8 +6,6 @@ import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { FormField, FormSelectField, formStyles } from '../components/forms/FormFields';
 import firebase from '../firebaseConfig';
 import { getAuth } from 'firebase/auth';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import * as ImagePicker from 'expo-image-picker';
 import { bookGenres } from './BookReviewScreen';
 import {
   createListing,
@@ -15,26 +13,53 @@ import {
   updateListing,
 } from '../components/books/ListingService';
 import { fetchBookByIsbn } from '../services/BookApiService';
+import { pickCoverImageFromLibrary, takeCoverPhoto, uploadImageUri } from '../services/MediaUploadService';
 
-function isRemoteUrl(value) {
-  return /^https?:\/\//i.test(String(value || ''));
+const DEFAULT_LISTING_FORM = {
+  condition: 'novo',
+  dealType: 'venda',
+  price: '',
+  title: '',
+  author: '',
+  publisher: '',
+  pages: '',
+  genre: '',
+  synopsis: '',
+  description: '',
+  isbn: '',
+};
+
+function createListingPayload(form, imageSource) {
+  return {
+    condition: form.condition,
+    dealType: form.dealType,
+    price: form.price,
+    title: form.title.trim(),
+    author: form.author.trim(),
+    publisher: form.publisher.trim(),
+    genre: form.genre,
+    pages: form.pages,
+    synopsis: form.synopsis,
+    description: form.description.trim(),
+    imageSource,
+    isbn: form.isbn.trim(),
+  };
+}
+
+function validateListingForm(form) {
+  if (!form.title.trim()) return 'Voce precisa informar o nome do livro!';
+  if (!form.author.trim()) return 'Voce precisa informar o nome do autor!';
+  if (!form.description.trim()) return 'Voce precisa informar a descricao do livro!';
+  if (form.dealType === 'venda' && !form.price.trim()) return 'Voce precisa informar o preco do livro!';
+
+  return '';
 }
 
 export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
   const listingId = routeParams?.listingId;
   const isEditing = Boolean(listingId);
 
-  const [condition, setCondition] = useState('novo');
-  const [dealType, setDealType] = useState('venda');
-  const [price, setPrice] = useState('');
-  const [title, setTitle] = useState('');
-  const [author, setAuthor] = useState('');
-  const [publisher, setPublisher] = useState('');
-  const [pages, setPages] = useState('');
-  const [genre, setGenre] = useState('');
-  const [synopsis, setSynopsis] = useState('');
-  const [description, setDescription] = useState('');
-  const [isbn, setIsbn] = useState('');
+  const [form, setForm] = useState(DEFAULT_LISTING_FORM);
   const [coverImage, setCoverImage] = useState('');
   const [existingImageSource, setExistingImageSource] = useState('');
   const [coverImageChanged, setCoverImageChanged] = useState(false);
@@ -43,7 +68,7 @@ export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
   const [fetchingIsbn, setFetchingIsbn] = useState(false);
 
   const auth = getAuth(firebase);
-  const storage = getStorage(firebase);
+  const updateForm = (field) => (value) => setForm((current) => ({ ...current, [field]: value }));
 
   useEffect(() => {
     if (!listingId) {
@@ -68,17 +93,19 @@ export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
           return;
         }
 
-        setCondition(String(listing.condition || 'novo').toLowerCase());
-        setDealType(String(listing.dealType || 'venda').toLowerCase());
-        setPrice(listing.price || '');
-        setTitle(listing.title || '');
-        setAuthor(listing.author || '');
-        setPublisher(listing.publisher || '');
-        setPages(listing.pages ? String(listing.pages) : '');
-        setGenre(listing.genre || '');
-        setSynopsis(listing.synopsis || '');
-        setDescription(listing.description || '');
-        setIsbn(listing.isbn || '');
+        setForm({
+          condition: String(listing.condition || 'novo').toLowerCase(),
+          dealType: String(listing.dealType || 'venda').toLowerCase(),
+          price: listing.price || '',
+          title: listing.title || '',
+          author: listing.author || '',
+          publisher: listing.publisher || '',
+          pages: listing.pages ? String(listing.pages) : '',
+          genre: listing.genre || '',
+          synopsis: listing.synopsis || '',
+          description: listing.description || '',
+          isbn: listing.isbn || '',
+        });
         setExistingImageSource(listing.imageSource || '');
         setCoverImage(listing.imageSource || '');
         setCoverImageChanged(false);
@@ -107,23 +134,10 @@ export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
       return;
     }
 
-    if (!title.trim()) {
-      alert('Voce precisa informar o nome do livro!');
-      return;
-    }
+    const validationMessage = validateListingForm(form);
 
-    if (!author.trim()) {
-      alert('Voce precisa informar o nome do autor!');
-      return;
-    }
-
-    if (!description.trim()) {
-      alert('Voce precisa informar a descricao do livro!');
-      return;
-    }
-
-    if (dealType === 'venda' && !price.trim()) {
-      alert('Voce precisa informar o preco do livro!');
+    if (validationMessage) {
+      alert(validationMessage);
       return;
     }
 
@@ -133,25 +147,12 @@ export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
       let imageSource = existingImageSource;
 
       if (coverImageChanged && coverImage) {
-        imageSource = await uploadCoverImage(user.uid);
+        imageSource = await uploadImageUri(coverImage, `listing-covers/${user.uid}/${Date.now()}.jpg`);
       } else if (!coverImageChanged && coverImage) {
         imageSource = coverImage;
       }
 
-      const payload = {
-        condition,
-        dealType,
-        price,
-        title: title.trim(),
-        author: author.trim(),
-        publisher: publisher.trim(),
-        genre,
-        pages,
-        synopsis,
-        description: description.trim(),
-        imageSource,
-        isbn: isbn.trim(),
-      };
+      const payload = createListingPayload(form, imageSource);
 
       if (isEditing) {
         await updateListing(listingId, user.uid, payload);
@@ -173,15 +174,18 @@ export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
     setFetchingIsbn(true);
 
     try {
-      const bookData = await fetchBookByIsbn(isbn);
+      const bookData = await fetchBookByIsbn(form.isbn);
 
-      if (bookData.title) setTitle(bookData.title);
-      if (bookData.author) setAuthor(bookData.author);
-      if (bookData.publisher) setPublisher(bookData.publisher);
-      if (bookData.pages) setPages(bookData.pages);
-      if (bookData.synopsis) setSynopsis(bookData.synopsis);
-      if (bookData.genre) setGenre(bookData.genre);
-      if (bookData.isbn) setIsbn(bookData.isbn);
+      setForm((current) => ({
+        ...current,
+        title: bookData.title || current.title,
+        author: bookData.author || current.author,
+        publisher: bookData.publisher || current.publisher,
+        pages: bookData.pages || current.pages,
+        synopsis: bookData.synopsis || current.synopsis,
+        genre: bookData.genre || current.genre,
+        isbn: bookData.isbn || current.isbn,
+      }));
 
       if (bookData.imageSource) {
         setCoverImage(bookData.imageSource);
@@ -195,62 +199,33 @@ export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
   }
 
   async function escolherImagem() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    try {
+      const imageUri = await pickCoverImageFromLibrary();
 
-    if (!permission.granted) {
-      alert('Permita acesso a galeria para escolher uma imagem!');
-      return;
-    }
+      if (!imageUri) {
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setCoverImage(result.assets[0].uri);
+      setCoverImage(imageUri);
       setCoverImageChanged(true);
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel escolher a imagem.');
     }
   }
 
   async function tirarFoto() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    try {
+      const imageUri = await takeCoverPhoto();
 
-    if (!permission.granted) {
-      alert('Permita o acesso a camera para tirar uma foto!');
-      return;
-    }
+      if (!imageUri) {
+        return;
+      }
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setCoverImage(result.assets[0].uri);
+      setCoverImage(imageUri);
       setCoverImageChanged(true);
+    } catch (error) {
+      alert(error.message || 'Nao foi possivel tirar a foto.');
     }
-  }
-
-  async function uploadCoverImage(userId) {
-    if (!coverImage) {
-      return '';
-    }
-
-    if (isRemoteUrl(coverImage)) {
-      return coverImage.replace(/^http:/, 'https:');
-    }
-
-    const response = await fetch(coverImage);
-    const blob = await response.blob();
-    const fileRef = storageRef(storage, `listing-covers/${userId}/${Date.now()}.jpg`);
-
-    await uploadBytes(fileRef, blob);
-    return await getDownloadURL(fileRef);
   }
 
   if (loadingListing) {
@@ -295,8 +270,8 @@ export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
         <FormField
           label="ISBN"
           placeholder="9788535910159"
-          value={isbn}
-          onChangeText={setIsbn}
+          value={form.isbn}
+          onChangeText={updateForm('isbn')}
           keyboardType="numeric"
         />
         <TouchableOpacity
@@ -312,19 +287,19 @@ export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
         <Text style={formStyles.formLabel}>FORMA DE NEGOCIACAO</Text>
         <View style={formStyles.segmented}>
           <TouchableOpacity
-            style={[formStyles.segment, dealType === 'venda' && formStyles.segmentActive]}
-            onPress={() => setDealType('venda')}
+            style={[formStyles.segment, form.dealType === 'venda' && formStyles.segmentActive]}
+            onPress={() => updateForm('dealType')('venda')}
           >
-            <Text style={dealType === 'venda' ? formStyles.segmentActiveText : formStyles.segmentText}>
+            <Text style={form.dealType === 'venda' ? formStyles.segmentActiveText : formStyles.segmentText}>
               VENDA
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[formStyles.segment, dealType === 'troca' && formStyles.segmentActive]}
-            onPress={() => setDealType('troca')}
+            style={[formStyles.segment, form.dealType === 'troca' && formStyles.segmentActive]}
+            onPress={() => updateForm('dealType')('troca')}
           >
-            <Text style={dealType === 'troca' ? formStyles.segmentActiveText : formStyles.segmentText}>
+            <Text style={form.dealType === 'troca' ? formStyles.segmentActiveText : formStyles.segmentText}>
               TROCA
             </Text>
           </TouchableOpacity>
@@ -333,30 +308,30 @@ export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
         <Text style={formStyles.formLabel}>ESTADO DO LIVRO</Text>
         <View style={formStyles.segmented}>
           <TouchableOpacity
-            style={[formStyles.segment, condition === 'novo' && formStyles.segmentActive]}
-            onPress={() => setCondition('novo')}
+            style={[formStyles.segment, form.condition === 'novo' && formStyles.segmentActive]}
+            onPress={() => updateForm('condition')('novo')}
           >
-            <Text style={condition === 'novo' ? formStyles.segmentActiveText : formStyles.segmentText}>
+            <Text style={form.condition === 'novo' ? formStyles.segmentActiveText : formStyles.segmentText}>
               NOVO
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[formStyles.segment, condition === 'usado' && formStyles.segmentActive]}
-            onPress={() => setCondition('usado')}
+            style={[formStyles.segment, form.condition === 'usado' && formStyles.segmentActive]}
+            onPress={() => updateForm('condition')('usado')}
           >
-            <Text style={condition === 'usado' ? formStyles.segmentActiveText : formStyles.segmentText}>
+            <Text style={form.condition === 'usado' ? formStyles.segmentActiveText : formStyles.segmentText}>
               USADO
             </Text>
           </TouchableOpacity>
         </View>
 
-        {dealType === 'venda' && (
+        {form.dealType === 'venda' && (
           <FormField
             label="Valor (R$)"
             placeholder="0,00"
-            value={price}
-            onChangeText={setPrice}
+            value={form.price}
+            onChangeText={updateForm('price')}
             keyboardType="numeric"
           />
         )}
@@ -366,26 +341,26 @@ export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
         <FormField
           label="NOME DO LIVRO"
           placeholder="Ex: O Alquimista"
-          value={title}
-          onChangeText={setTitle}
+          value={form.title}
+          onChangeText={updateForm('title')}
         />
 
-        <FormField label="AUTOR" placeholder="Paulo Coelho" value={author} onChangeText={setAuthor} />
+        <FormField label="AUTOR" placeholder="Paulo Coelho" value={form.author} onChangeText={updateForm('author')} />
 
         <FormField
           label="EDITORA"
           placeholder="Companhia das Letras"
-          value={publisher}
-          onChangeText={setPublisher}
+          value={form.publisher}
+          onChangeText={updateForm('publisher')}
         />
 
-        <FormSelectField label="GENERO" value={genre} options={bookGenres} onChange={setGenre} />
+        <FormSelectField label="GENERO" value={form.genre} options={bookGenres} onChange={updateForm('genre')} />
 
         <FormField
           label="N DE PAGINAS"
           placeholder="208"
-          value={pages}
-          onChangeText={setPages}
+          value={form.pages}
+          onChangeText={updateForm('pages')}
           keyboardType="numeric"
         />
 
@@ -394,15 +369,15 @@ export function AddBookListingScreen({ navigate, openMenu, routeParams }) {
           placeholder="Uma breve introducao a obra..."
           multiline
           height={95}
-          value={synopsis}
-          onChangeText={setSynopsis}
+          value={form.synopsis}
+          onChangeText={updateForm('synopsis')}
         />
 
         <FormField
           label="DESCRICAO DA UNIDADE"
           placeholder="Descreva o estado fisico, dedicatorias ou detalhes especificos do seu exemplar..."
-          value={description}
-          onChangeText={setDescription}
+          value={form.description}
+          onChangeText={updateForm('description')}
           multiline
           height={132}
         />

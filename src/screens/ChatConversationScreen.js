@@ -13,7 +13,6 @@ import {
   View,
 } from 'react-native';
 import { Entypo, Feather, Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../theme/appColors';
 import { cardShadow } from '../theme/cardShadow';
 import { useResponsiveLayout } from '../theme/ResponsiveLayoutContext';
@@ -32,9 +31,11 @@ import {
   sendTextMessage,
   setTyping,
 } from '../components/chat/ChatService';
+import { pickChatImageFromLibrary } from '../services/MediaUploadService';
 import firebase from '../firebaseConfig';
 import { getAuth } from 'firebase/auth';
 import { getDatabase, onValue, ref, update } from 'firebase/database';
+import { snapshotToArray, sortByOldest } from '../utils/firebaseSnapshots';
 
 const TYPING_STALE_MS = 3000;
 const TYPING_DEBOUNCE_MS = 2500;
@@ -160,18 +161,7 @@ export function ChatConversationScreen({ navigate, routeParams }) {
     const messagesRef = ref(db, `chats/${chatId}/messages`);
 
     const unsubscribe = onValue(messagesRef, (snapshot) => {
-      const data = snapshot.val();
-
-      if (!data) {
-        setMessages([]);
-        return;
-      }
-
-      const messagesArray = Object.entries(data)
-        .map(([id, message]) => ({ id, ...message }))
-        .sort((a, b) => (a.criadoEm || 0) - (b.criadoEm || 0));
-
-      setMessages(messagesArray);
+      setMessages(snapshotToArray(snapshot).sort(sortByOldest('criadoEm')));
     });
 
     return () => unsubscribe();
@@ -355,27 +345,16 @@ export function ChatConversationScreen({ navigate, routeParams }) {
   }
 
   async function handlePickImage() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      alert('Permita acesso a galeria para enviar uma imagem.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-
-    if (result.canceled || !chatId || !chat || !user) {
-      return;
-    }
-
-    setSendingAttachment(true);
-
     try {
+      const imageUri = await pickChatImageFromLibrary();
+
+      if (!imageUri || !chatId || !chat || !user) {
+        return;
+      }
+
+      setSendingAttachment(true);
       await clearTyping(chatId, user.uid);
-      await sendImageMessage(chatId, chat, user, result.assets[0].uri);
+      await sendImageMessage(chatId, chat, user, imageUri);
     } catch (error) {
       alert(error.message || 'Nao foi possivel enviar a imagem.');
     } finally {

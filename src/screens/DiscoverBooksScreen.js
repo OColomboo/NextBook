@@ -15,6 +15,7 @@ import {
   listingMatchesGenre,
   listingMatchesSearch,
 } from '../utils/listingFilters';
+import { snapshotToArray, sortByNewest } from '../utils/firebaseSnapshots';
 
 export function DiscoverBooksScreen({ navigate, openMenu }) {
   const { isCompact } = useResponsiveLayout();
@@ -31,21 +32,7 @@ export function DiscoverBooksScreen({ navigate, openMenu }) {
     const listingRef = ref(db, 'bookListings');
 
     const unsubscribe = onValue(listingRef, (snapshot) => {
-      const data = snapshot.val();
-
-      if (!data) {
-        setBookListings([]);
-        return;
-      }
-
-      const listingsArray = Object.entries(data)
-        .map(([id, listing]) => ({
-          id,
-          ...listing,
-        }))
-        .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
-
-      setBookListings(listingsArray);
+      setBookListings(snapshotToArray(snapshot).sort(sortByNewest('criadoEm')));
     });
 
     return () => unsubscribe();

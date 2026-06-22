@@ -17,6 +17,7 @@ import { colors } from '../../theme/appColors';
 import { cardShadow } from '../../theme/cardShadow';
 import { addComment, deleteComment, updateComment } from './ReviewService';
 import { useResponsiveLayout } from '../../theme/ResponsiveLayoutContext';
+import { snapshotToArray, sortByOldest } from '../../utils/firebaseSnapshots';
 
 function formatCommentDate(value) {
   if (!value) {
@@ -55,18 +56,7 @@ export function ReviewCommentsModal({ visible, onClose, reviewId, reviewTitle, c
     const commentsRef = ref(db, `reviews/${reviewId}/comments`);
 
     const unsubscribe = onValue(commentsRef, (snapshot) => {
-      const data = snapshot.val();
-
-      if (!data) {
-        setComments([]);
-        return;
-      }
-
-      const commentsArray = Object.entries(data)
-        .map(([id, comment]) => ({ id, ...comment }))
-        .sort((a, b) => (a.criadoEm || 0) - (b.criadoEm || 0));
-
-      setComments(commentsArray);
+      setComments(snapshotToArray(snapshot).sort(sortByOldest('criadoEm')));
     });
 
     return () => unsubscribe();

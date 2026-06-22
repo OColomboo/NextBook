@@ -13,17 +13,14 @@ import { CommunityPostCard } from '../components/community/CommunityPostCard';
 import { toggleSavedListing } from '../components/books/ListingService';
 import { toggleSavedReview } from '../components/community/ReviewService';
 import { listingMatchesSearch } from '../utils/listingFilters';
-
-function mapFirebaseList(value) {
-  if (!value) return [];
-
-  return Object.entries(value)
-    .map(([id, item]) => ({ id, ...item }))
-    .sort((a, b) => getTimestamp(b) - getTimestamp(a));
-}
+import { snapshotToArray } from '../utils/firebaseSnapshots';
 
 function getTimestamp(item) {
   return item?.criadoEm || item?.savedAt || item?.negotiatedAt || 0;
+}
+
+function mapShelfSnapshot(snapshot) {
+  return snapshotToArray(snapshot).sort((a, b) => getTimestamp(b) - getTimestamp(a));
 }
 
 function isTradeListing(book) {
@@ -207,7 +204,7 @@ export function BookDetailsScreen({ navigate, openMenu }) {
 
     const listingsRef = ref(db, 'bookListings');
     const unsubscribe = onValue(listingsRef, (snapshot) => {
-      const listings = mapFirebaseList(snapshot.val()).filter((book) => book.userId === user.uid);
+      const listings = mapShelfSnapshot(snapshot).filter((book) => book.userId === user.uid);
       setMyListings(listings);
     });
 
@@ -222,7 +219,7 @@ export function BookDetailsScreen({ navigate, openMenu }) {
 
     const savedRef = ref(db, `savedListings/${user.uid}`);
     const unsubscribe = onValue(savedRef, (snapshot) => {
-      setSavedListings(mapFirebaseList(snapshot.val()));
+      setSavedListings(mapShelfSnapshot(snapshot));
     });
 
     return unsubscribe;
@@ -236,7 +233,7 @@ export function BookDetailsScreen({ navigate, openMenu }) {
 
     const negotiatedRef = ref(db, `negotiatedListings/${user.uid}`);
     const unsubscribe = onValue(negotiatedRef, (snapshot) => {
-      setNegotiatedListings(mapFirebaseList(snapshot.val()));
+      setNegotiatedListings(mapShelfSnapshot(snapshot));
     });
 
     return unsubscribe;
@@ -250,7 +247,7 @@ export function BookDetailsScreen({ navigate, openMenu }) {
 
     const savedReviewsRef = ref(db, `savedReviews/${user.uid}`);
     const unsubscribe = onValue(savedReviewsRef, (snapshot) => {
-      setSavedReviews(mapFirebaseList(snapshot.val()));
+      setSavedReviews(mapShelfSnapshot(snapshot));
     });
 
     return unsubscribe;

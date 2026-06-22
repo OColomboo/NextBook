@@ -8,11 +8,11 @@ import { MainScreenScaffold } from '../components/layout/MainScreenScaffold';
 import { GenrePillTag } from '../components/books/GenrePillTag';
 import { UserAvatar } from '../components/community/UserAvatar';
 import { abrirChat } from '../components/chat/ChatService';
-import { toggleSavedListing } from '../components/books/ListingService';
-import { getListingMetaTags, shareListing } from '../utils/listingShare';
+import { markListingAsNegotiated, toggleSavedListing } from '../components/books/ListingService';
+import { getListingMetaTags, getListingNegotiatedStatus, shareListing } from '../utils/listingShare';
 import firebase from '../firebaseConfig';
 import { getAuth } from 'firebase/auth';
-import { getDatabase, onValue, ref, remove, serverTimestamp, set } from 'firebase/database';
+import { getDatabase, onValue, ref } from 'firebase/database';
 
 export function BookListingDetailScreen({ navigate, openMenu, routeParams }) {
   const { gutterContent, isCompact, width } = useResponsiveLayout();
@@ -106,15 +106,7 @@ export function BookListingDetailScreen({ navigate, openMenu, routeParams }) {
         return;
       }
 
-      const status = book.dealType === 'troca' ? 'trocado' : 'vendido';
-
-      await set(ref(db, `negotiatedListings/${user.uid}/${book.id}`), {
-        ...book,
-        status,
-        negotiatedAt: serverTimestamp(),
-      });
-
-      await remove(ref(db, `bookListings/${book.id}`));
+      await markListingAsNegotiated(user.uid, book, getListingNegotiatedStatus(book));
       alert('Anuncio movido para negociados.');
       navigate('discover');
     } catch (error) {

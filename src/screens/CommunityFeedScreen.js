@@ -15,6 +15,7 @@ import {
 import firebase from '../firebaseConfig';
 import { getDatabase, onValue, ref } from 'firebase/database';
 import { getAuth } from 'firebase/auth';
+import { snapshotToArray, sortByNewest } from '../utils/firebaseSnapshots';
 
 export function CommunityFeedScreen({ navigate, openMenu }) {
   const { bottomTabBarHeight } = useResponsiveLayout();
@@ -30,21 +31,7 @@ export function CommunityFeedScreen({ navigate, openMenu }) {
   useEffect(() => {
     const reviewRef = ref(db, 'reviews');
     const unsubscribe = onValue(reviewRef, (snapshot) => {
-      const data = snapshot.val();
-
-      if (!data) {
-        setReviews([]);
-        return;
-      }
-
-      const reviewsArray = Object.entries(data)
-        .map(([id, item]) => ({
-          id,
-          ...item,
-        }))
-        .sort((a, b) => (b.criadoEm || 0) - (a.criadoEm || 0));
-
-      setReviews(reviewsArray);
+      setReviews(snapshotToArray(snapshot).sort(sortByNewest('criadoEm')));
     });
 
     return () => unsubscribe();
